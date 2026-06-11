@@ -120,15 +120,24 @@ class PoissonModel:
                 if i > 0 and j > 0:
                     both_teams_to_score_prob += prob
 
+        def calc_fair_odd(prob):
+            return round(1 / prob, 2) if prob > 0.01 else 0.0
+
         return {
-            "Home Win": round(home_win_prob * 100, 2),
-            "Draw": round(draw_prob * 100, 2),
-            "Away Win": round(away_win_prob * 100, 2),
+            "Home Win %": round(home_win_prob * 100, 2),
+            "Home Odd": calc_fair_odd(home_win_prob),
+            "Draw %": round(draw_prob * 100, 2),
+            "Draw Odd": calc_fair_odd(draw_prob),
+            "Away Win %": round(away_win_prob * 100, 2),
+            "Away Odd": calc_fair_odd(away_win_prob),
             "Home xG": round(home_xg, 2),
             "Away xG": round(away_xg, 2),
             "Most Likely Score": most_likely_score,
-            "Most Likely Score Prob": round(most_likely_score_prob * 100, 2),
-            "Over 1.5": round(over_1_5_prob * 100, 2),
-            "Over 2.5": round(over_2_5_prob * 100, 2),
-            "BTTS (Ambos Marcam)": round(both_teams_to_score_prob * 100, 2)
+            "Score Prob %": round(most_likely_score_prob * 100, 2),
+            "Over 1.5 %": round(over_1_5_prob * 100, 2),
+            "Over 1.5 Odd": calc_fair_odd(over_1_5_prob),
+            "Over 2.5 %": round(over_2_5_prob * 100, 2),
+            "Over 2.5 Odd": calc_fair_odd(over_2_5_prob),
+            "BTTS %": round(both_teams_to_score_prob * 100, 2),
+            "BTTS Odd": calc_fair_odd(both_teams_to_score_prob)
         }
