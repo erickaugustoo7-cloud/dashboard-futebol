@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime, timedelta
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,21 +10,45 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from models.poisson_model import PoissonModel
 
-# ── 1. Configuração da Página ──
-st.set_page_config(page_title="Football AI Predictor", page_icon="⚽", layout="wide")
-st.title("⚽ Football AI Predictor - Dashboard Preditivo")
-st.markdown("Bem-vindo ao motor de inteligência que analisa o passado para prever a próxima rodada.")
+# ── 1. Configuração e Estilo Premium ──
+st.set_page_config(page_title="Football AI Predictor Pro", page_icon="🔮", layout="wide")
+
+st.markdown("""
+<style>
+    /* Estilo Premium Dark */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
+    }
+    .metric-card {
+        background-color: #1E212B;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #00ff88;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
+    }
+    .value-bet {
+        color: #00ff88 !important;
+        font-weight: bold;
+    }
+    .danger-bet {
+        color: #ff4b4b !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🔮 Football AI Predictor - Pro Dashboard")
+st.markdown("*Plataforma avançada de análise preditiva e odds matemáticas baseada em Distribuição de Poisson.*")
 
 # ── 2. Inicializar Firebase ──
 @st.cache_resource
 def init_firebase():
-    # 1. Tenta carregar do .env.local (ambiente local)
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env.local")
     load_dotenv(dotenv_path=env_path)
     
     cert_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     
-    # 2. Se não encontrar (ambiente de Produção / Streamlit Cloud), busca nos Secrets
     if not cert_json:
         try:
             cert_json = st.secrets["FIREBASE_SERVICE_ACCOUNT"]
@@ -52,103 +77,246 @@ def load_matches():
         df = df.sort_values('date')
     return df
 
-with st.spinner("Carregando milhares de jogos do Firebase..."):
+with st.spinner("Sincronizando banco de dados de inteligência..."):
     df_all = load_matches()
 
 if df_all.empty:
     st.warning("Nenhum jogo encontrado no Firebase.")
     st.stop()
 
-# ── 4. Filtros Laterais ──
-st.sidebar.header("Filtros de Análise")
-leagues = df_all['leagueName'].dropna().unique().tolist()
-selected_league = st.sidebar.selectbox("Selecione a Liga:", leagues)
+# ── 4. Filtros Globais (Sidebar) ──
+st.sidebar.header("⚙️ Configurações Globais")
 
-df_league = df_all[df_all['leagueName'] == selected_league]
-
-# Separa jogos finalizados de jogos futuros
-df_finished = df_league[df_league['status'].isin(['FT', 'AET', 'PEN'])]
-df_upcoming = df_league[df_league['status'].isin(['NS', 'TBD'])]
-
-st.sidebar.metric("Jogos Analisados", len(df_finished))
-st.sidebar.metric("Próximos Jogos", len(df_upcoming))
-
-# ── 5. Inteligência Artificial (Poisson) ──
-if not df_finished.empty:
-    model = PoissonModel(df_finished)
+# Filtro de Data do Histórico (Treinamento do Modelo)
+# Pega a data mínima real do banco de dados
+if not df_all.empty and 'date' in df_all.columns:
+    valid_dates = df_all['date'].dropna()
+    min_date = valid_dates.min().date() if not valid_dates.empty else datetime(2022, 1, 1).date()
+    max_date = valid_dates.max().date() if not valid_dates.empty else datetime.now().date()
 else:
-    model = None
+    min_date = datetime(2022, 1, 1).date()
+    max_date = datetime.now().date()
 
-# ── 6. Visualização do Histórico ──
-st.subheader(f"📊 Análise Histórica: {selected_league}")
-col1, col2 = st.columns(2)
+st.sidebar.subheader("Janela de Treinamento (Passado)")
+hist_start_date = st.sidebar.date_input("Usar histórico a partir de:", min_date,
+    min_value=min_date, max_value=max_date)
+hist_end_date = st.sidebar.date_input("Usar histórico até:", max_date,
+    min_value=min_date, max_value=max_date)
 
-with col1:
-    if not df_finished.empty:
-        # Gráfico de Vitórias
-        conditions = [
-            (df_finished['goalsHome'] > df_finished['goalsAway']),
-            (df_finished['goalsHome'] < df_finished['goalsAway'])
-        ]
-        choices = ['Vitória Casa', 'Vitória Fora']
-        df_finished['Resultado'] = np.select(conditions, choices, default='Empate')
-        
-        fig = px.pie(df_finished, names='Resultado', title="Distribuição de Resultados (Vantagem de Casa)", color_discrete_sequence=px.colors.sequential.RdBu)
-        st.plotly_chart(fig, use_container_width=True)
+# Filtrar o DataFrame de Treinamento
+df_filtered_history = df_all[
+    (df_all['date'].dt.date >= hist_start_date) &
+    (df_all['date'].dt.date <= hist_end_date)
+]
+df_finished_all = df_filtered_history[df_filtered_history['status'].isin(['FT', 'AET', 'PEN'])]
 
-with col2:
-    if not df_finished.empty:
-        # Gráfico de Placares Comuns
-        df_finished['Placar'] = df_finished['goalsHome'].astype(int).astype(str) + " x " + df_finished['goalsAway'].astype(int).astype(str)
-        top_scores = df_finished['Placar'].value_counts().head(10).reset_index()
-        top_scores.columns = ['Placar', 'Frequência']
-        
-        fig2 = px.bar(top_scores, x='Placar', y='Frequência', title="Top 10 Placares Mais Comuns", text='Frequência')
-        st.plotly_chart(fig2, use_container_width=True)
+# Jogos NS/TBD (não iniciados) - todos os disponíveis no banco
+# O plano gratuito da API só tem até 2024, então mostramos todos os NS/TBD encontrados
+st.sidebar.subheader("Filtro da Rodada")
+df_all_ns = df_all[df_all['status'].isin(['NS', 'TBD'])]
 
-st.divider()
-
-# ── 7. Previsões da Próxima Rodada ──
-st.subheader("🔮 Previsões da Inteligência Artificial (Próxima Rodada)")
-st.markdown("Com base no histórico matemático (Distribuição de Poisson), aqui estão as probabilidades exatas para os próximos jogos desta liga.")
-
-if df_upcoming.empty:
-    st.info("Não há jogos futuros mapeados no banco para esta liga no momento.")
-elif model is None:
-    st.warning("Não há histórico suficiente para calcular probabilidades.")
+if not df_all_ns.empty:
+    ns_dates = df_all_ns['date'].dropna()
+    ns_min = ns_dates.min().date() if not ns_dates.empty else min_date
+    ns_max = ns_dates.max().date() if not ns_dates.empty else max_date
+    rodada_start = st.sidebar.date_input("Rodada de:", ns_min, min_value=ns_min, max_value=ns_max)
+    rodada_end = st.sidebar.date_input("Rodada até:", ns_max, min_value=ns_min, max_value=ns_max)
+    df_upcoming_all = df_all_ns[
+        (df_all_ns['date'].dt.date >= rodada_start) &
+        (df_all_ns['date'].dt.date <= rodada_end)
+    ]
 else:
-    predictions = []
+    df_upcoming_all = pd.DataFrame()
+    st.sidebar.info("Não há jogos futuros no banco.")
+
+st.sidebar.divider()
+st.sidebar.subheader("🏆 Filtro de Liga")
+
+all_leagues = sorted(df_all['leagueName'].dropna().unique().tolist())
+selected_leagues = st.sidebar.multiselect(
+    "Selecione as ligas:", 
+    options=all_leagues,
+    default=all_leagues,
+    placeholder="Escolha as ligas..."
+)
+
+# Aplica o filtro de liga em ambos os DataFrames
+if selected_leagues:
+    df_finished_all = df_finished_all[df_finished_all['leagueName'].isin(selected_leagues)]
+    if not df_upcoming_all.empty and 'leagueName' in df_upcoming_all.columns:
+        df_upcoming_all = df_upcoming_all[df_upcoming_all['leagueName'].isin(selected_leagues)]
+
+st.sidebar.divider()
+st.sidebar.metric("Jogos no Banco de Dados", len(df_all))
+st.sidebar.metric("Jogos Usados no Treinamento", len(df_finished_all))
+st.sidebar.metric("Jogos para Previsão", len(df_upcoming_all))
+
+# ── 5. Estrutura de Abas (Tabs) ──
+tab1, tab2, tab3 = st.tabs(["🌍 Radar Global (Value Bets)", "📊 Análise por Liga", "🔗 Construtor de Múltiplas"])
+
+# ==========================================
+# ABA 1: RADAR GLOBAL
+# ==========================================
+with tab1:
+    st.header("Radar de Apostas de Valor")
+    st.markdown("O algoritmo vasculhou **todas as ligas** e encontrou as melhores oportunidades matemáticas.")
     
-    # Processa apenas os próximos 10 jogos para não poluir a tela
-    for _, match in df_upcoming.head(10).iterrows():
-        home = match.get('homeTeamName', 'Unknown')
-        away = match.get('awayTeamName', 'Unknown')
-        date_str = match.get('date', 'Data TBD')
-        
-        pred = model.predict_match(home, away)
-        
-        # Identificar apostas de valor (Value Bets) visualmente
-        value_alert = ""
-        if pred["Home Win"] > 60:
-            value_alert = "🔥 Favorito Claro (Casa)"
-        elif pred["Away Win"] > 60:
-            value_alert = "🔥 Favorito Claro (Fora)"
-        elif pred["Over 2.5"] > 60:
-            value_alert = "⚽ Tendência Over 2.5 Gols"
+    if df_upcoming_all.empty:
+        st.info("Não há jogos NS/TBD disponíveis para o período selecionado na sidebar.")
+    else:
+        with st.spinner("Processando IA Global..."):
+            all_predictions = []
             
-        predictions.append({
-            "Data": str(date_str)[:10],
-            "Confronto": f"{home} vs {away}",
-            "Vitória Casa": f"{pred['Home Win']}%",
-            "Empate": f"{pred['Draw']}%",
-            "Vitória Fora": f"{pred['Away Win']}%",
-            "Ambos Marcam": f"{pred['BTTS (Ambos Marcam)']}%",
-            "Mais 2.5 Gols": f"{pred['Over 2.5']}%",
-            "Placar xG": pred['Most Likely Score'],
-            "Alerta": value_alert
-        })
+            # Agrupar histórico por liga para criar modelos individuais
+            leagues = df_upcoming_all['leagueName'].unique()
+            for league in leagues:
+                df_hist_league = df_finished_all[df_finished_all['leagueName'] == league]
+                if df_hist_league.empty: continue
+                
+                model = PoissonModel(df_hist_league)
+                df_up_league = df_upcoming_all[df_upcoming_all['leagueName'] == league]
+                
+                for _, match in df_up_league.iterrows():
+                    home = match.get('homeTeamName', 'Unknown')
+                    away = match.get('awayTeamName', 'Unknown')
+                    date_str = str(match.get('date', 'Data TBD'))[:10]
+                    
+                    pred = model.predict_match(home, away)
+                    pred['Liga'] = league
+                    pred['Data'] = date_str
+                    pred['Confronto'] = f"{home} vs {away}"
+                    all_predictions.append(pred)
+            
+            if all_predictions:
+                df_preds = pd.DataFrame(all_predictions)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("🔥 Top 5 Favoritos (Match Odds)")
+                    # Filtra times com maior chance de vitória
+                    df_favs = df_preds.copy()
+                    df_favs['Max Win %'] = df_favs[['Home Win %', 'Away Win %']].max(axis=1)
+                    df_favs['Pick'] = np.where(df_favs['Home Win %'] > df_favs['Away Win %'], 'Casa', 'Fora')
+                    df_favs['Fair Odd'] = np.where(df_favs['Pick'] == 'Casa', df_favs['Home Odd'], df_favs['Away Odd'])
+                    
+                    top_favs = df_favs.sort_values(by='Max Win %', ascending=False).head(5)
+                    st.dataframe(top_favs[['Liga', 'Data', 'Confronto', 'Pick', 'Max Win %', 'Fair Odd']], hide_index=True)
+                
+                with col2:
+                    st.subheader("⚽ Top 5 Jogos para Gols (Over 2.5)")
+                    top_goals = df_preds.sort_values(by='Over 2.5 %', ascending=False).head(5)
+                    st.dataframe(top_goals[['Liga', 'Data', 'Confronto', 'Over 2.5 %', 'Over 2.5 Odd', 'BTTS %']], hide_index=True)
+
+
+# ==========================================
+# ABA 2: ANÁLISE POR LIGA
+# ==========================================
+with tab2:
+    available_leagues = df_finished_all['leagueName'].dropna().unique().tolist()
+    if not available_leagues:
+        st.warning("Sem histórico de jogos finalizados no período selecionado.")
+    else:
+        selected_league = st.selectbox("Selecione a Liga para análise detalhada:", available_leagues)
         
-    df_preds = pd.DataFrame(predictions)
-    st.dataframe(df_preds, use_container_width=True, hide_index=True)
+        df_league_hist = df_finished_all[df_finished_all['leagueName'] == selected_league].copy()
+        
+        # Filtra jogos não iniciados apenas se a coluna existir e o df não estiver vazio
+        if not df_upcoming_all.empty and 'leagueName' in df_upcoming_all.columns:
+            df_league_up = df_upcoming_all[df_upcoming_all['leagueName'] == selected_league]
+        else:
+            df_league_up = pd.DataFrame()
+        
+        st.markdown(f"### Histórico Matemático: {selected_league}")
+        c1, c2 = st.columns(2)
+        with c1:
+            conditions = [
+                (df_league_hist['goalsHome'] > df_league_hist['goalsAway']),
+                (df_league_hist['goalsHome'] < df_league_hist['goalsAway'])
+            ]
+            df_league_hist['Resultado'] = np.select(conditions, ['Vitória Casa', 'Vitória Fora'], default='Empate')
+            fig = px.pie(df_league_hist, names='Resultado', title="Vantagem de Casa (1X2)", hole=0.3)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with c2:
+            df_league_hist['Placar'] = df_league_hist['goalsHome'].astype(int).astype(str) + " x " + df_league_hist['goalsAway'].astype(int).astype(str)
+            top_scores = df_league_hist['Placar'].value_counts().head(8).reset_index()
+            top_scores.columns = ['Placar', 'Freq']
+            fig2 = px.bar(top_scores, x='Placar', y='Freq', title="Placares mais Frequentes")
+            st.plotly_chart(fig2, use_container_width=True)
+            
+        st.markdown("### Previsões e Odds Justas da Rodada")
+        if not df_league_up.empty and not df_league_hist.empty:
+            league_model = PoissonModel(df_league_hist)
+            preds = []
+            for _, match in df_league_up.iterrows():
+                home = match.get('homeTeamName', 'Unknown')
+                away = match.get('awayTeamName', 'Unknown')
+                date_str = str(match.get('date', 'Data TBD'))[:10]
+                p = league_model.predict_match(home, away)
+                preds.append({
+                    "Data": date_str,
+                    "Jogo": f"{home} x {away}",
+                    "Casa %": p['Home Win %'], "Odd Casa": p['Home Odd'],
+                    "Empate %": p['Draw %'], "Odd Empate": p['Draw Odd'],
+                    "Fora %": p['Away Win %'], "Odd Fora": p['Away Odd'],
+                    "O2.5 %": p['Over 2.5 %'], "Odd O2.5": p['Over 2.5 Odd']
+                })
+            st.dataframe(pd.DataFrame(preds), hide_index=True, use_container_width=True)
+        else:
+            st.info("ℹ️ Não há jogos NS/TBD nesta liga. Para ver previsões de todos os confrontos históricos, selecione uma janela de datas na barra lateral.")
+
+# ==========================================
+# ABA 3: CONSTRUTOR DE MÚLTIPLAS
+# ==========================================
+with tab3:
+    st.header("Construtor de Múltiplas (Parlay Builder)")
+    st.markdown("Selecione vários eventos para calcular a Probabilidade Acumulada e a Odd Justa Final.")
     
-    st.caption("A fórmula de Poisson calcula as Expectativas de Gols (xG) baseada no ataque e defesa dos dois times ao longo das últimas temporadas armazenadas no Firebase.")
+    if df_upcoming_all.empty:
+        st.warning("Não há jogos disponíveis para montar múltiplas.")
+    else:
+        # Puxa o mesmo all_predictions gerado no Radar
+        if 'df_preds' in locals():
+            st.write("Escolha as seleções que deseja colocar no seu Bilhete:")
+            
+            selected_picks = []
+            
+            for idx, row in df_preds.iterrows():
+                with st.expander(f"{row['Data']} | {row['Liga']} | {row['Confronto']}"):
+                    col_a, col_b, col_c, col_d = st.columns(4)
+                    with col_a:
+                        if st.checkbox(f"Casa (Odd {row['Home Odd']})", key=f"h_{idx}"):
+                            selected_picks.append({"Jogo": row['Confronto'], "Mercado": "Vitória Casa", "Prob": row['Home Win %'], "Odd": row['Home Odd']})
+                    with col_b:
+                        if st.checkbox(f"Empate (Odd {row['Draw Odd']})", key=f"d_{idx}"):
+                            selected_picks.append({"Jogo": row['Confronto'], "Mercado": "Empate", "Prob": row['Draw %'], "Odd": row['Draw Odd']})
+                    with col_c:
+                        if st.checkbox(f"Fora (Odd {row['Away Odd']})", key=f"a_{idx}"):
+                            selected_picks.append({"Jogo": row['Confronto'], "Mercado": "Vitória Fora", "Prob": row['Away Win %'], "Odd": row['Away Odd']})
+                    with col_d:
+                        if st.checkbox(f"Over 2.5 (Odd {row['Over 2.5 Odd']})", key=f"o_{idx}"):
+                            selected_picks.append({"Jogo": row['Confronto'], "Mercado": "Mais de 2.5 Gols", "Prob": row['Over 2.5 %'], "Odd": row['Over 2.5 Odd']})
+            
+            if selected_picks:
+                st.divider()
+                st.subheader("🧾 O Seu Bilhete")
+                df_bilhete = pd.DataFrame(selected_picks)
+                st.dataframe(df_bilhete, hide_index=True)
+                
+                # Cálculo da Múltipla
+                prob_acumulada = 1.0
+                odd_acumulada = 1.0
+                for p in selected_picks:
+                    prob_acumulada *= (p['Prob'] / 100)
+                    odd_acumulada *= p['Odd']
+                
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>Resumo da Múltipla</h3>
+                    <p><b>Probabilidade Matemática Acumulada:</b> {round(prob_acumulada * 100, 2)}%</p>
+                    <p><b>ODD JUSTA FINAL:</b> <span class="value-bet">{round(odd_acumulada, 2)}</span></p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Nenhuma previsão processada.")
