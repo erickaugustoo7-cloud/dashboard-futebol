@@ -1,0 +1,32 @@
+name: Data Sync & Model Learning (10x a day)
+
+on:
+  schedule:
+    # Roda a cada 2 horas durante o dia (0, 2, 4, 6... UTC)
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Permite rodar manualmente pelo GitHub
+
+jobs:
+  sync_and_learn:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip' # Acelera a instalação
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar Sincronização e Aprendizado do Modelo
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Buscando partidas recentes..."
+          python scripts/sync_recent.py
