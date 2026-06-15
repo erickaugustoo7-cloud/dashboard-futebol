@@ -2,4 +2,6 @@ supabase
 requests
 pandas
 numpy
+scipy
 python-dotenv
+groq

@@ -1,32 +1,101 @@
-name: Data Sync & Model Learning (10x a day)
+name: Pipeline Automatico de Dados e Previsoes
 
 on:
   schedule:
-    # Roda a cada 2 horas durante o dia (0, 2, 4, 6... UTC)
+    # Job 1 e 2: Sincroniza dados e calcula stats a cada 2 horas
     - cron: '0 */2 * * *'
+    # Job 3: Gera previsoes 1x por dia, meia-noite UTC (21h Brasilia)
+    - cron: '0 0 * * *'
   workflow_dispatch: # Permite rodar manualmente pelo GitHub
 
 jobs:
-  sync_and_learn:
+  # ────────────────────────────────────────────────
+  # JOB 1: Busca novos resultados e partidas na ESPN
+  # ────────────────────────────────────────────────
+  sync_data:
+    name: "Sincronizar Dados (ESPN -> Supabase)"
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip' # Acelera a instalação
+          cache: 'pip'
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Rodar Sincronização e Aprendizado do Modelo
+      - name: Buscar partidas recentes
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "Buscando partidas recentes..."
+          echo "Sincronizando partidas recentes..."
           python scripts/sync_recent.py
+
+  # ────────────────────────────────────────────────
+  # JOB 2: Recalcula estatísticas de times e ligas
+  # (Roda logo após o Job 1 terminar)
+  # ────────────────────────────────────────────────
+  compute_stats:
+    name: "Calcular Estatisticas (team_stats_cache)"
+    runs-on: ubuntu-latest
+    needs: sync_data   # Aguarda o Job 1 terminar com sucesso
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Calcular stats de times e ligas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Calculando estatisticas (ELO, Forma, Forcas)..."
+          python scripts/compute_team_stats.py
+
+  # ────────────────────────────────────────────────
+  # JOB 3: Gera previsões para os próximos 7 dias
+  # (Roda 1x por dia à meia-noite, APÓS o Job 2)
+  # ────────────────────────────────────────────────
+  generate_predictions:
+    name: "Gerar Previsoes (tabela predictions)"
+    runs-on: ubuntu-latest
+    needs: compute_stats  # Aguarda o Job 2 terminar com sucesso
+    # Só roda quando acionado pelo cron da meia-noite OU manualmente
+    # Para evitar rodar nas 12 execuções de 2h do dia
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule' && startsWith(github.event.schedule, '0 0'))
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Gerar previsoes para os proximos 7 dias
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Gerando previsoes automaticas (Poisson + ELO + Forma Real 10j + H2H + IA Gemini)..."
+          python scripts/generate_predictions.py --days 7

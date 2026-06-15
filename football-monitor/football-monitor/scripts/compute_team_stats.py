@@ -378,10 +378,14 @@ def save_league_stats(records: list[dict]):
         return
     print(f"[5a/5] Salvando {len(records)} stats de liga no Supabase...")
     try:
-        supabase_client.table("league_stats_cache").upsert(records).execute()
+        supabase_client.table("league_stats_cache").upsert(
+            records, on_conflict="league_id,season"
+        ).execute()
         print("    -> OK!")
     except Exception as e:
         print(f"    -> ERRO: {e}")
+
+
 
 
 def save_team_stats(records: list[dict]):
@@ -394,11 +398,152 @@ def save_team_stats(records: list[dict]):
     for i in range(0, len(records), batch_size):
         batch = records[i:i + batch_size]
         try:
-            supabase_client.table("team_stats_cache").upsert(batch).execute()
+            supabase_client.table("team_stats_cache").upsert(
+                batch, on_conflict="team_id,league_id,season"
+            ).execute()
             saved += len(batch)
         except Exception as e:
             print(f"    -> ERRO no lote {i//batch_size + 1}: {e}")
     print(f"    -> {saved} registros salvos!")
+
+
+
+def compute_global_team_stats(df: pd.DataFrame, elo: dict) -> list[dict]:
+    """
+    Calcula estatísticas GLOBAIS de cada time (ignorando liga/temporada).
+    
+    Este perfil usa TODOS os jogos históricos do time de TODAS as ligas.
+    É salvo com league_id=0 e season=0, servindo como fallback para times
+    em competições internacionais (Copa do Mundo, Eurocopa, Libertadores, etc.)
+    onde não há stats específicas da liga.
+    """
+    print("[5c/5] Calculando perfil global dos times (cross-liga)...")
+    
+    df_ft = df.dropna(subset=["goals_home", "goals_away"]).copy()
+    df_ft["date"] = pd.to_datetime(df_ft["date"], utc=True)
+    today = pd.Timestamp.now(tz="UTC")
+    
+    # Encontra todos os times únicos
+    all_team_ids = set(df_ft["home_team_id"].tolist() + df_ft["away_team_id"].tolist())
+    
+    # Médias globais (base Poisson global)
+    global_avg_home = df_ft["goals_home"].mean() or 1.35
+    global_avg_away = df_ft["goals_away"].mean() or 1.10
+    
+    records = []
+    
+    for team_id in all_team_ids:
+        team_id = int(team_id)
+        
+        home_g = df_ft[df_ft["home_team_id"] == team_id]
+        away_g = df_ft[df_ft["away_team_id"] == team_id]
+        all_g  = pd.concat([home_g, away_g])
+        
+        if len(all_g) < 3:  # Menos de 3 jogos não vale
+            continue
+        
+        team_name = (
+            home_g["home_team_name"].iloc[0] if len(home_g) > 0
+            else away_g["away_team_name"].iloc[0]
+        )
+        
+        def safe_mean(series):
+            s = series.dropna()
+            return round(float(s.mean()), 4) if len(s) > 0 else None
+
+        def pct(condition, total):
+            return round(condition.sum() / max(total, 1) * 100, 2)
+        
+        total_matches = len(all_g)
+        nh = len(home_g)
+        na = len(away_g)
+        
+        gf_all = pd.concat([home_g["goals_home"].rename("gf"), away_g["goals_away"].rename("gf")])
+        ga_all = pd.concat([home_g["goals_away"].rename("ga"), away_g["goals_home"].rename("ga")])
+        btts_all  = (gf_all > 0) & (ga_all > 0)
+        total_all = gf_all + ga_all
+        
+        gf_h = home_g["goals_home"]
+        ga_h = home_g["goals_away"]
+        gf_a = away_g["goals_away"]
+        ga_a = away_g["goals_home"]
+        hw_h = (gf_h > ga_h)
+        hw_a = (gf_a > ga_a)
+        
+        # Forças relativas às médias globais (não da liga específica)
+        avg_scored_h   = gf_h.mean() if nh > 0 else global_avg_home
+        avg_conceded_h = ga_h.mean() if nh > 0 else global_avg_away
+        avg_scored_a   = gf_a.mean() if na > 0 else global_avg_away
+        avg_conceded_a = ga_a.mean() if na > 0 else global_avg_home
+        
+        atk_home = avg_scored_h / global_avg_home if global_avg_home > 0 else 1.0
+        def_home = avg_conceded_h / global_avg_away if global_avg_away > 0 else 1.0
+        atk_away = avg_scored_a / global_avg_away if global_avg_away > 0 else 1.0
+        def_away = avg_conceded_a / global_avg_home if global_avg_home > 0 else 1.0
+        
+        elo_rating = elo.get(team_id, ELO_BASE)
+        
+        # Form recente
+        form5  = build_form_json(all_g, team_id, 5)
+        form10 = build_form_json(all_g, team_id, 10)
+        
+        last_dates = all_g["date"].dropna()
+        last_date  = last_dates.max()
+        days_since = (today - last_date).days if pd.notna(last_date) else None
+        
+        # Fadiga recente
+        recent_14 = all_g[all_g["date"] >= (today - timedelta(days=14))]
+        matches_14 = len(recent_14)
+        fatigue = min(10, max(0, (matches_14 - 1) * 2.5))
+        
+        records.append({
+            "team_id":                  team_id,
+            "team_name":                str(team_name),
+            "league_id":                0,   # 0 = perfil global cross-liga
+            "season":                   0,   # 0 = global
+            "total_matches":            total_matches,
+            "avg_goals_scored":         round(float(gf_all.mean()), 4),
+            "avg_goals_conceded":       round(float(ga_all.mean()), 4),
+            "avg_shots":                safe_mean(pd.concat([home_g.get("home_shots", pd.Series(dtype=float)), away_g.get("away_shots", pd.Series(dtype=float))])),
+            "avg_sog":                  safe_mean(pd.concat([home_g.get("home_sog", pd.Series(dtype=float)), away_g.get("away_sog", pd.Series(dtype=float))])),
+            "avg_corners":              safe_mean(pd.concat([home_g.get("home_corners", pd.Series(dtype=float)), away_g.get("away_corners", pd.Series(dtype=float))])),
+            "avg_yellow_cards":         safe_mean(pd.concat([home_g.get("home_yellow_cards", pd.Series(dtype=float)), away_g.get("away_yellow_cards", pd.Series(dtype=float))])),
+            "btts_pct":                 pct(btts_all, total_matches),
+            "over15_pct":               pct(total_all > 1.5, total_matches),
+            "over25_pct":               pct(total_all > 2.5, total_matches),
+            "over35_pct":               pct(total_all > 3.5, total_matches),
+            "home_matches":             nh,
+            "avg_goals_scored_home":    round(float(gf_h.mean()), 4) if nh > 0 else None,
+            "avg_goals_conceded_home":  round(float(ga_h.mean()), 4) if nh > 0 else None,
+            "avg_shots_home":           safe_mean(home_g.get("home_shots", pd.Series(dtype=float))),
+            "avg_corners_home":         safe_mean(home_g.get("home_corners", pd.Series(dtype=float))),
+            "btts_pct_home":            pct((gf_h > 0) & (ga_h > 0), nh),
+            "over25_pct_home":          pct((gf_h + ga_h) > 2.5, nh),
+            "home_win_pct":             pct(hw_h, nh),
+            "away_matches":             na,
+            "avg_goals_scored_away":    round(float(gf_a.mean()), 4) if na > 0 else None,
+            "avg_goals_conceded_away":  round(float(ga_a.mean()), 4) if na > 0 else None,
+            "avg_shots_away":           safe_mean(away_g.get("away_shots", pd.Series(dtype=float))),
+            "avg_corners_away":         safe_mean(away_g.get("away_corners", pd.Series(dtype=float))),
+            "btts_pct_away":            pct((gf_a > 0) & (ga_a > 0), na),
+            "over25_pct_away":          pct((gf_a + ga_a) > 2.5, na),
+            "away_win_pct":             pct(hw_a, na),
+            "attack_strength_home":     round(float(atk_home), 4),
+            "defense_strength_home":    round(float(def_home), 4),
+            "attack_strength_away":     round(float(atk_away), 4),
+            "defense_strength_away":    round(float(def_away), 4),
+            "elo_rating":               round(float(elo_rating), 2),
+            "form_last5":               json.dumps(form5, ensure_ascii=False),
+            "form_last10":              json.dumps(form10, ensure_ascii=False),
+            "last_match_date":          str(last_date.date()) if pd.notna(last_date) else None,
+            "days_since_last_match":    days_since,
+            "matches_last_14_days":     matches_14,
+            "fatigue_score":            round(fatigue, 2),
+            "updated_at":               datetime.now().isoformat()
+        })
+    
+    print(f"    -> {len(records)} perfis globais calculados.")
+    return records
 
 
 def main():
@@ -425,6 +570,11 @@ def main():
     
     save_league_stats(league_records)
     save_team_stats(team_records)
+    
+    # Perfil global cross-liga (usado como fallback para Copa do Mundo, Eurocopa, etc.)
+    if not args.league:  # Só calcula perfil global se for run completo
+        global_records = compute_global_team_stats(df, elo)
+        save_team_stats(global_records)
     
     print("\n" + "="*70)
     print(" CONCLUIDO COM SUCESSO!")

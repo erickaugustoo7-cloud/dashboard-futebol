@@ -38,8 +38,8 @@ from espn_client import (
 
 # Configurações do Backfill
 # Ligas a processar (mapeadas no espn_client.py)
-LEAGUES_TO_PROCESS = [71, 39, 140, 135, 78, 61, 2, 3, 13, 11, 73, 1, 9, 4]
-SEASONS = [2022, 2023, 2024, 2025, 2026]
+LEAGUES_TO_PROCESS = [10, 20] # Apenas amistosos nesta rodada
+SEASONS = [2024, 2025, 2026]
 
 # Nomes legíveis das ligas (para gravar no banco)
 LEAGUE_DISPLAY_NAMES = {
@@ -57,6 +57,8 @@ LEAGUE_DISPLAY_NAMES = {
     1:   "Copa do Mundo FIFA",
     9:   "Copa América",
     4:   "Eurocopa",
+    10:  "Amistosos Internacionais",
+    20:  "Amistosos de Clubes",
 }
 
 DELAY_BETWEEN_DAYS = 0.3    # Ser gentil com a API da ESPN

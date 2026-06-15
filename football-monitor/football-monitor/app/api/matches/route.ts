@@ -26,5 +26,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data || []);
+  const TEAM_TRANSLATIONS: Record<string, string> = {
+    "Spain": "Espanha", "Cape Verde": "Cabo Verde", "Germany": "Alemanha",
+    "England": "Inglaterra", "France": "França", "Italy": "Itália",
+    "Netherlands": "Holanda", "Portugal": "Portugal", "Belgium": "Bélgica",
+    "Croatia": "Croácia", "Switzerland": "Suíça", "Denmark": "Dinamarca",
+    "Sweden": "Suécia", "Poland": "Polônia", "Austria": "Áustria",
+    "Czech Republic": "República Tcheca", "Hungary": "Hungria", "Turkey": "Turquia",
+    "Scotland": "Escócia", "Wales": "País de Gales", "Ireland": "Irlanda",
+    "Serbia": "Sérvia", "Ukraine": "Ucrânia", "Greece": "Grécia",
+    "Norway": "Noruega", "Finland": "Finlândia", "Romania": "Romênia",
+    "Slovakia": "Eslováquia", "Slovenia": "Eslovênia", "Iceland": "Islândia",
+    "Argentina": "Argentina", "Brazil": "Brasil", "Uruguay": "Uruguai",
+    "Colombia": "Colômbia", "Chile": "Chile", "Peru": "Peru",
+    "Ecuador": "Equador", "Paraguay": "Paraguai", "Venezuela": "Venezuela",
+    "Bolivia": "Bolívia", "Mexico": "México", "United States": "Estados Unidos",
+    "Canada": "Canadá", "Costa Rica": "Costa Rica", "Japan": "Japão",
+    "South Korea": "Coreia do Sul", "Australia": "Austrália", "Iran": "Irã",
+    "Saudi Arabia": "Arábia Saudita", "Morocco": "Marrocos", "Senegal": "Senegal",
+    "Egypt": "Egito", "Nigeria": "Nigéria", "Cameroon": "Camarões",
+    "Ghana": "Gana", "Ivory Coast": "Costa do Marfim", "Algeria": "Argélia",
+    "South Africa": "África do Sul", "New Zealand": "Nova Zelândia"
+  };
+
+  const translatedData = (data || []).map(m => ({
+    ...m,
+    home_team_name: TEAM_TRANSLATIONS[m.home_team_name] || m.home_team_name,
+    away_team_name: TEAM_TRANSLATIONS[m.away_team_name] || m.away_team_name
+  }));
+
+  return NextResponse.json(translatedData);
 }

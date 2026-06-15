@@ -25,7 +25,9 @@ LEAGUE_MAPPING = {
     73: "bra.copa_do_brazil",     # Copa do Brasil
     1: "fifa.world",              # Copa do Mundo
     9: "conmebol.america",        # Copa America
-    4: "uefa.euro"                # Eurocopa
+    4: "uefa.euro",               # Eurocopa
+    10: "fifa.friendly",          # Amistosos Internacionais
+    20: "club.friendly"           # Amistosos de Clubes
 }
 
 # Mapeamento reverso para facilitar a busca

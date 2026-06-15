@@ -16,7 +16,7 @@ from espn_client import (
     parse_espn_event
 )
 
-LEAGUES_TO_PROCESS = [71, 39, 140, 135, 78, 61, 2, 3, 13, 11, 73, 1, 9, 4]
+LEAGUES_TO_PROCESS = [71, 39, 140, 135, 78, 61, 2, 3, 13, 11, 73, 1, 9, 4, 10, 20]
 LEAGUE_DISPLAY_NAMES = {
     71:  "Brasileirão Série A",
     39:  "Premier League",
@@ -32,6 +32,8 @@ LEAGUE_DISPLAY_NAMES = {
     1:   "Copa do Mundo FIFA",
     9:   "Copa América",
     4:   "Eurocopa",
+    10:  "Amistosos Internacionais",
+    20:  "Amistosos de Clubes",
 }
 
 DELAY_BETWEEN_DAYS = 0.3

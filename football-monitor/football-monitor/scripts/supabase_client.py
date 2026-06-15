@@ -9,7 +9,11 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # Carregar variáveis de ambiente
-env_path = os.path.join(os.path.dirname(__file__), "..", ".env.local")
+try:
+    base_dir = os.path.dirname(__file__)
+except NameError:
+    base_dir = os.getcwd()
+env_path = os.path.join(base_dir, "..", ".env.local")
 load_dotenv(dotenv_path=env_path)
 
 url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")

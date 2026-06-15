@@ -3,10 +3,79 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!;
   return createClient(url, key);
+}
+
+// Mapa de tradução para seleções (Inglês ESPN -> Português)
+const TEAM_TRANSLATIONS: Record<string, string> = {
+  "Spain": "Espanha",
+  "Cape Verde": "Cabo Verde",
+  "Germany": "Alemanha",
+  "England": "Inglaterra",
+  "France": "França",
+  "Italy": "Itália",
+  "Netherlands": "Holanda",
+  "Portugal": "Portugal",
+  "Belgium": "Bélgica",
+  "Croatia": "Croácia",
+  "Switzerland": "Suíça",
+  "Denmark": "Dinamarca",
+  "Sweden": "Suécia",
+  "Poland": "Polônia",
+  "Austria": "Áustria",
+  "Czech Republic": "República Tcheca",
+  "Hungary": "Hungria",
+  "Turkey": "Turquia",
+  "Scotland": "Escócia",
+  "Wales": "País de Gales",
+  "Ireland": "Irlanda",
+  "Serbia": "Sérvia",
+  "Ukraine": "Ucrânia",
+  "Greece": "Grécia",
+  "Norway": "Noruega",
+  "Finland": "Finlândia",
+  "Romania": "Romênia",
+  "Slovakia": "Eslováquia",
+  "Slovenia": "Eslovênia",
+  "Iceland": "Islândia",
+  "Argentina": "Argentina",
+  "Brazil": "Brasil",
+  "Uruguay": "Uruguai",
+  "Colombia": "Colômbia",
+  "Chile": "Chile",
+  "Peru": "Peru",
+  "Ecuador": "Equador",
+  "Paraguay": "Paraguai",
+  "Venezuela": "Venezuela",
+  "Bolivia": "Bolívia",
+  "Mexico": "México",
+  "United States": "Estados Unidos",
+  "Canada": "Canadá",
+  "Costa Rica": "Costa Rica",
+  "Japan": "Japão",
+  "South Korea": "Coreia do Sul",
+  "Australia": "Austrália",
+  "Iran": "Irã",
+  "Saudi Arabia": "Arábia Saudita",
+  "Morocco": "Marrocos",
+  "Senegal": "Senegal",
+  "Egypt": "Egito",
+  "Nigeria": "Nigéria",
+  "Cameroon": "Camarões",
+  "Ghana": "Gana",
+  "Ivory Coast": "Costa do Marfim",
+  "Algeria": "Argélia",
+  "South Africa": "África do Sul",
+  "New Zealand": "Nova Zelândia"
+};
+
+function translateTeamName(name: string): string {
+  if (!name) return "";
+  return TEAM_TRANSLATIONS[name] || name;
 }
 
 function fairOdd(prob: number): number {
@@ -50,6 +119,7 @@ function quickPoisson(homeXg: number, awayXg: number, maxGoals = 6) {
 }
 
 async function getTeamStats(sb: any, teamId: number, leagueId: number, season: number) {
+  // Primeira tentativa: stats específicos da liga/temporada
   const { data } = await sb
     .from("team_stats_cache")
     .select("*")
@@ -57,7 +127,28 @@ async function getTeamStats(sb: any, teamId: number, leagueId: number, season: n
     .eq("league_id", leagueId)
     .eq("season", season)
     .limit(1);
-  return data?.[0] ?? null;
+  if (data?.[0]) return data[0];
+
+  // Segunda tentativa: perfil global cross-liga (league_id=0, season=0)
+  // Gerado pelo compute_team_stats.py usando TODOS os jogos do time
+  // Garante que times internacionais (Copa do Mundo, Eurocopa) tenham ELO real
+  const { data: globalData } = await sb
+    .from("team_stats_cache")
+    .select("*")
+    .eq("team_id", teamId)
+    .eq("league_id", 0)
+    .eq("season", 0)
+    .limit(1);
+  if (globalData?.[0]) return globalData[0];
+
+  // Última tentativa: qualquer dado do time (ELO mais recente)
+  const { data: anyData } = await sb
+    .from("team_stats_cache")
+    .select("elo_rating, attack_strength_home, defense_strength_home, attack_strength_away, defense_strength_away")
+    .eq("team_id", teamId)
+    .order("season", { ascending: false })
+    .limit(1);
+  return anyData?.[0] ?? null;
 }
 
 async function getLeagueStats(sb: any, leagueId: number, season: number) {
@@ -173,19 +264,19 @@ function generateInsight(
   // H2H insights
   if (h2h && h2h.total >= 3) {
     if (h2h.team1_win_pct >= 60) {
-      insights.push(`📊 Domínio histórico de ${homeName}: venceu ${h2h.team1_wins} dos últimos ${h2h.total} confrontos diretos (${h2h.team1_win_pct}%).`);
+      insights.push(`Domínio histórico de ${homeName}: venceu ${h2h.team1_wins} dos últimos ${h2h.total} confrontos diretos (${h2h.team1_win_pct}%).`);
     } else if (h2h.team2_wins / h2h.total >= 0.6) {
-      insights.push(`📊 Histórico favorece ${awayName}: ${h2h.team2_wins} vitórias nos últimos ${h2h.total} H2H.`);
+      insights.push(`Histórico favorece ${awayName}: ${h2h.team2_wins} vitórias nos últimos ${h2h.total} H2H.`);
     } else {
-      insights.push(`📊 Confrontos equilibrados: ${h2h.team1_wins}V ${h2h.draws}E ${h2h.team2_wins}D nos últimos ${h2h.total} jogos.`);
+      insights.push(`Confrontos equilibrados: ${h2h.team1_wins}V ${h2h.draws}E ${h2h.team2_wins}D nos últimos ${h2h.total} jogos.`);
     }
     if (h2h.avg_goals >= 3.0) {
-      insights.push(`⚽ Jogos com muitos gols entre esses times: média de ${h2h.avg_goals} gols por jogo no H2H.`);
+      insights.push(`Jogos com muitos gols entre esses times: média de ${h2h.avg_goals} gols por jogo no H2H.`);
     } else if (h2h.avg_goals <= 1.5) {
-      insights.push(`🛡️ Confrontos tendem a ser fechados: média de apenas ${h2h.avg_goals} gols por jogo no H2H.`);
+      insights.push(`Confrontos tendem a ser fechados: média de apenas ${h2h.avg_goals} gols por jogo no H2H.`);
     }
     if (h2h.btts_pct >= 65) {
-      insights.push(`🔥 Ambas as equipes marcaram em ${h2h.btts_pct}% dos últimos confrontos diretos.`);
+      insights.push(`Ambas as equipes marcaram em ${h2h.btts_pct}% dos últimos confrontos diretos.`);
     }
   }
 
@@ -194,65 +285,90 @@ function generateInsight(
     const homePPG = homeForm.points / Math.max(homeForm.results.length, 1);
     const awayPPG = awayForm.points / Math.max(awayForm.results.length, 1);
     if (homePPG >= 2.4) {
-      insights.push(`🔥 ${homeName} em grande fase: ${homeForm.points} pontos nos últimos ${homeForm.results.length} jogos.`);
+      insights.push(`${homeName} em grande fase: ${homeForm.points} pontos nos últimos ${homeForm.results.length} jogos.`);
     }
     if (awayPPG >= 2.4) {
-      insights.push(`🔥 ${awayName} também em excelente forma: ${awayForm.points} pts nos últimos ${awayForm.results.length} jogos.`);
+      insights.push(`${awayName} também em excelente forma: ${awayForm.points} pts nos últimos ${awayForm.results.length} jogos.`);
     }
     if (homeForm.clean_sheets >= 3) {
-      insights.push(`🧱 ${homeName} com defesa sólida: ${homeForm.clean_sheets} clean sheets recentes.`);
+      insights.push(`${homeName} com defesa sólida: ${homeForm.clean_sheets} clean sheets recentes.`);
     }
     if (awayForm.clean_sheets >= 3) {
-      insights.push(`🧱 ${awayName} com defesa sólida: ${awayForm.clean_sheets} clean sheets recentes.`);
+      insights.push(`${awayName} com defesa sólida: ${awayForm.clean_sheets} clean sheets recentes.`);
     }
   }
 
   // Probabilidades
   const dominant = homeWinP > awayWinP ? homeName : awayName;
   const dominantP = Math.max(homeWinP, awayWinP);
-  if (dominantP >= 55) {
-    insights.push(`📈 Modelo favorece ${dominant} com ${dominantP.toFixed(0)}% de probabilidade de vitória.`);
+  const underdog = homeWinP > awayWinP ? awayName : homeName;
+  
+  if (dominantP >= 75) {
+    insights.push(`Alerta de Favoritismo MÁXIMO: ${dominant} tem chance esmagadora de vitória (${dominantP.toFixed(0)}%). Diferença técnica brutal no confronto.`);
+  } else if (dominantP >= 55) {
+    insights.push(`Modelo favorece claramente ${dominant} com ${dominantP.toFixed(0)}% de probabilidade de vitória.`);
   }
+  
   if (over25P >= 65) {
-    insights.push(`⚽ Alta probabilidade de jogo movimentado: ${over25P.toFixed(0)}% de chance de Over 2.5 gols.`);
+    insights.push(`Alta probabilidade de jogo movimentado: ${over25P.toFixed(0)}% de chance de Over 2.5 gols.`);
   } else if (over25P <= 35) {
-    insights.push(`🛡️ Jogo tende a ser fechado: apenas ${over25P.toFixed(0)}% de chance de Over 2.5 gols.`);
+    insights.push(`Jogo tende a ser muito fechado: apenas ${over25P.toFixed(0)}% de chance de Over 2.5 gols.`);
   }
   if (bttsP >= 65) {
-    insights.push(`🔥 Ambas equipes tendem a marcar: ${bttsP.toFixed(0)}% de chance de BTTS.`);
+    insights.push(`Ambas equipes tendem a marcar: ${bttsP.toFixed(0)}% de chance de BTTS (Ambas Marcam).`);
+  } else if (bttsP <= 35) {
+    insights.push(`Chance alta de pelo menos uma equipe não sofrer gols (BTTS Não: ${(100 - bttsP).toFixed(0)}%).`);
   }
 
-  if (insights.length === 0) {
-    if (dominantP > 40) {
-      insights.push(`⚖️ Jogo equilibrado, com leve favoritismo para ${dominant} (${dominantP.toFixed(0)}%).`);
-    } else {
-      insights.push(`⚖️ Confronto muito parelho, com chances reais de empate (${drawP.toFixed(0)}%).`);
+  // Preenche até ter no mínimo 5 insights (fallbacks adicionais estatísticos)
+  if (insights.length < 5) {
+    if (dominantP > 40 && dominantP < 55) {
+      insights.push(`Jogo levemente inclinado para ${dominant} (${dominantP.toFixed(0)}%), mas ${underdog} não pode ser descartado.`);
+    } else if (dominantP <= 40) {
+      insights.push(`Confronto muito parelho, com chances reais de empate (${drawP.toFixed(0)}%).`);
     }
-    insights.push(`⚽ Expectativa moderada de gols: ${over25P.toFixed(0)}% de probabilidade de Over 2.5.`);
-  } else if (insights.length === 1) {
-    if (over25P > 40 && over25P < 65) {
-      insights.push(`⚽ Expectativa moderada de gols na partida (${over25P.toFixed(0)}% para Over 2.5).`);
-    } else if (bttsP > 40 && bttsP < 65) {
-      insights.push(`⚽ Probabilidade razoável de ambas as equipes marcarem (${bttsP.toFixed(0)}%).`);
+  }
+  
+  if (insights.length < 5) {
+    if (homeXg > awayXg * 1.5) {
+      insights.push(`As Chances de Gol projetam um ataque muito superior para ${homeName} neste embate.`);
+    } else if (awayXg > homeXg * 1.5) {
+      insights.push(`Força de criação ofensiva pesa a favor do visitante ${awayName}.`);
     } else {
-      insights.push(`⚖️ O modelo aponta um jogo com dinâmica equilibrada fora as tendências principais.`);
+      insights.push(`As Chances de Gol de ambos os times estão parelhas, sugerindo jogo truncado no meio campo.`);
     }
   }
 
-  return insights.slice(0, 4);
+  if (insights.length < 5) {
+    insights.push(`A estatística preditiva considera um jogo de ${over25P > 50 ? 'mais' : 'menos'} de 2.5 gols em um cenário normal.`);
+  }
+  
+  if (insights.length < 5) {
+    insights.push(`Análise de defesas aponta ${homeWinP > 50 ? 'maior resistência defensiva para o mandante.' : 'que a defesa visitante é o pilar deste confronto.'}`);
+  }
+
+  if (insights.length < 5) {
+    insights.push(`Insight bônus: Odd justa projetada para Vitória de ${dominant} é de ${(100 / dominantP).toFixed(2)}.`);
+  }
+
+  // Garante que retorne pelo menos 5, sem cortar as que já existiam se forem maiores
+  return insights.length > 5 ? insights : insights;
 }
 
 async function analyzeMatch(sb: any, match: any) {
   const { home_team_id, away_team_id, league_id, season, fixture_id } = match;
 
-  const [homeStats, awayStats, leagueStats, h2hMatches, homeRecent, awayRecent] = await Promise.all([
+  const [homeStats, awayStats, leagueStats, h2hMatches, homeRecent, awayRecent, dbPredResult] = await Promise.all([
     getTeamStats(sb, home_team_id, league_id, season),
     getTeamStats(sb, away_team_id, league_id, season),
     getLeagueStats(sb, league_id, season),
     getH2H(sb, home_team_id, away_team_id, 8),
     getRecentForm(sb, home_team_id, 5),
     getRecentForm(sb, away_team_id, 5),
+    sb.from("predictions").select("*").eq("fixture_id", fixture_id).limit(1).single()
   ]);
+
+  const dbPred = dbPredResult?.data ?? null;
 
   const avgH = leagueStats?.avg_home_goals ?? 1.35;
   const avgA = leagueStats?.avg_away_goals ?? 1.10;
@@ -264,10 +380,30 @@ async function analyzeMatch(sb: any, match: any) {
 
   const eloH = homeStats?.elo_rating ?? 1500;
   const eloA = awayStats?.elo_rating ?? 1500;
-  const eloFactor = Math.max(0.85, Math.min(1.15, 1 + ((eloH - eloA) / 100) * 0.04));
 
-  let homeXg = Math.max(0.3, Math.min(4.5, atkH * defA * avgH * eloFactor));
-  let awayXg = Math.max(0.3, Math.min(4.5, atkA * defH * avgA / Math.max(eloFactor, 0.9)));
+  // ─── xG com ELO como ancora principal ─────────────────────────────────
+  // Passo 1: probabilidade de vitória do mandante pelo ELO clássico
+  //          (incluindo vantagem de 100 pts para o mandante)
+  const eloHomeWinProb = 1 / (1 + Math.pow(10, (eloA - eloH - 100) / 400));
+
+  // Passo 2: razão xG derivada do ELO — homeXg/awayXg ≈ sqrt(winProb/losProb)
+  //          Isso garante que se P(home)=0.91, xG home >> xG away sempre.
+  const xgRatioElo = Math.sqrt(eloHomeWinProb / Math.max(0.01, 1 - eloHomeWinProb));
+
+  // Passo 3: razão bruta pelas forças de ataque/defesa (contexto estatístico)
+  const rawHomeXg = atkH * (defA > 0 ? defA : 1.0) * avgH;
+  const rawAwayXg = atkA * (defH > 0 ? defH : 1.0) * avgA;
+  const xgRatioStats = rawHomeXg / Math.max(0.01, rawAwayXg);
+
+  // Passo 4: mistura ponderada (70% ELO, 30% stats)
+  //          O ELO domina, mas a estatística afia o resultado
+  const blendedRatio = xgRatioElo * 0.7 + xgRatioStats * 0.3;
+
+  // Passo 5: calcula xG mantendo a soma próxima da média histórica da liga
+  const totalAvgXg = avgH + avgA;  // ex: 1.35 + 1.10 = 2.45
+  let homeXg = Math.max(0.3, Math.min(5.0, totalAvgXg * blendedRatio / (1 + blendedRatio)));
+  let awayXg = Math.max(0.3, Math.min(5.0, totalAvgXg / (1 + blendedRatio)));
+  // ──────────────────────────────────────────────────────────────────────
 
   // H2H adjustment
   const h2hSummary = computeH2HSummary(h2hMatches, home_team_id);
@@ -303,22 +439,26 @@ async function analyzeMatch(sb: any, match: any) {
   const adjDraw    = Math.max(0.05, probs.draw);
   const sumAdj     = adjHomeWin + adjDraw + adjAwayWin;
 
-  const homeWinP = (adjHomeWin / sumAdj) * 100;
-  const drawP    = (adjDraw / sumAdj) * 100;
-  const awayWinP = (adjAwayWin / sumAdj) * 100;
-  const over25P  = probs.over25 * 100;
-  const bttsP    = probs.btts * 100;
+  let homeWinP = (adjHomeWin / sumAdj) * 100;
+  let drawP    = (adjDraw / sumAdj) * 100;
+  let awayWinP = (adjAwayWin / sumAdj) * 100;
+  let over25P  = probs.over25 * 100;
+  let bttsP    = probs.btts * 100;
 
-  // Gera insights textuais
-  const insights = generateInsight(
-    match.home_team_name, match.away_team_name,
+  // Gera insights textuais (fallback)
+  let insights = generateInsight(
+    translateTeamName(match.home_team_name), translateTeamName(match.away_team_name),
     h2hSummary, homeFormSummary, awayFormSummary,
     homeXg, awayXg,
     homeWinP, drawP, awayWinP,
     over25P, bttsP
   );
 
+  // NOTA: A tabela 'predictions' (dbPred) foi removida como fonte de override.
+  // O modelo agora usa diretamente ELO Global + Poisson + Forma, que é mais preciso.
+
   // Escolhe melhor sugestão
+
   const candidates = [
     { market: "over25",   label: "Over 2.5 Gols",             prob: over25P,        contextPct: leagueStats?.over25_pct ?? 50 },
     { market: "under25",  label: "Under 2.5 Gols",            prob: 100 - over25P,  contextPct: 100 - (leagueStats?.over25_pct ?? 50) },
@@ -367,8 +507,8 @@ async function analyzeMatch(sb: any, match: any) {
     league_id,
     league_name:   match.league_name,
     date:          match.date,
-    home_team:     match.home_team_name,
-    away_team:     match.away_team_name,
+    home_team:     translateTeamName(match.home_team_name),
+    away_team:     translateTeamName(match.away_team_name),
     home_team_id:  match.home_team_id,
     away_team_id:  match.away_team_id,
     home_xg:       Math.round(homeXg * 100) / 100,
@@ -378,12 +518,46 @@ async function analyzeMatch(sb: any, match: any) {
     away_win_prob: Math.round(awayWinP * 10) / 10,
     over25_prob:   Math.round(over25P * 10) / 10,
     btts_prob:     Math.round(bttsP * 10) / 10,
-    home_elo:      homeStats?.elo_rating ?? null,
-    away_elo:      awayStats?.elo_rating ?? null,
+    home_elo:      eloH,
+    away_elo:      eloA,
     home_form:     homeFormSummary,
     away_form:     awayFormSummary,
     h2h:           h2hSummary,
     insights,
+    // ─── Scout stats de cada time ────────────────────────────────────────
+    home_scout: homeStats ? {
+      avg_shots:         homeStats.avg_shots          ?? null,
+      avg_sog:           homeStats.avg_sog             ?? null,
+      avg_corners:       homeStats.avg_corners         ?? null,
+      avg_yellow_cards:  homeStats.avg_yellow_cards    ?? null,
+      avg_goals_scored:  homeStats.avg_goals_scored    ?? null,
+      avg_goals_conceded:homeStats.avg_goals_conceded  ?? null,
+      over25_pct:        homeStats.over25_pct          ?? null,
+      btts_pct:          homeStats.btts_pct            ?? null,
+      home_win_pct:      homeStats.home_win_pct        ?? null,
+      away_win_pct:      homeStats.away_win_pct        ?? null,
+      attack_strength:   homeStats.attack_strength_home ?? null,
+      defense_strength:  homeStats.defense_strength_home ?? null,
+      total_matches:     homeStats.total_matches       ?? null,
+      fatigue_score:     homeStats.fatigue_score       ?? null,
+    } : null,
+    away_scout: awayStats ? {
+      avg_shots:         awayStats.avg_shots           ?? null,
+      avg_sog:           awayStats.avg_sog             ?? null,
+      avg_corners:       awayStats.avg_corners         ?? null,
+      avg_yellow_cards:  awayStats.avg_yellow_cards    ?? null,
+      avg_goals_scored:  awayStats.avg_goals_scored    ?? null,
+      avg_goals_conceded:awayStats.avg_goals_conceded  ?? null,
+      over25_pct:        awayStats.over25_pct          ?? null,
+      btts_pct:          awayStats.btts_pct            ?? null,
+      home_win_pct:      awayStats.home_win_pct        ?? null,
+      away_win_pct:      awayStats.away_win_pct        ?? null,
+      attack_strength:   awayStats.attack_strength_away ?? null,
+      defense_strength:  awayStats.defense_strength_away ?? null,
+      total_matches:     awayStats.total_matches       ?? null,
+      fatigue_score:     awayStats.fatigue_score       ?? null,
+    } : null,
+    // ─────────────────────────────────────────────────────────────────────
     suggestion: {
       market:           best.market,
       label:            best.label,
@@ -401,6 +575,7 @@ async function analyzeMatch(sb: any, match: any) {
     })),
   };
 }
+
 
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';

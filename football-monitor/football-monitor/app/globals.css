@@ -37,9 +37,9 @@
   --low-border: rgba(239, 68, 68, 0.3);
 
   /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #ffffff; /* Brighter, pure white */
+  --text-secondary: #cbd5e1; /* Slate 300 (previously 400) */
+  --text-muted: #94a3b8; /* Slate 400 (previously 600) */
 
   /* Gradients */
   --grad-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
@@ -760,7 +760,7 @@ body {
 }
 
 .xg-bar-away {
-  background: #8b5cf6;
+  background: var(--medium);
 }
 
 /* ── Form Dots ── */

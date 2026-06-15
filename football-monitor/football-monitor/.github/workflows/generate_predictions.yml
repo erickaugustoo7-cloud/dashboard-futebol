@@ -1,0 +1,42 @@
+name: Automacao Previsoes Diarias
+
+on:
+  schedule:
+    # Roda todos os dias as 09:00 UTC (06:00 horario de Brasilia)
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Permite rodar manualmente no painel do GitHub
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o codigo (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Configurar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Instalar Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install tensorflow scikit-learn nbformat
+
+      - name: Rodar Analise e IA (Previsoes)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Cria o .env.local para o script conseguir ler as chaves
+          echo "GROQ_API_KEY=$GROQ_API_KEY" >> .env.local
+          echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" >> .env.local
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> .env.local
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env.local
+          
+          # Roda o script de previsoes puxando dados usando a Rede Neural
+          python scripts/generate_predictions.py --use-nn

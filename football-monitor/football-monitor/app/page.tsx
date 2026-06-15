@@ -249,49 +249,41 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* H2H Compacto */}
-                  <div style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    marginBottom: '10px',
-                    border: '1px solid var(--border)',
-                    minHeight: '74px',
-                  }}>
-                    {h2h && h2h.total >= 2 ? (
-                      <>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          H2H — últimos {h2h.total} confrontos
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ flex: 1, textAlign: 'center' }}>
-                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--high)' }}>{h2h.team1_wins}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Vitórias</div>
-                          </div>
-                          <div style={{ flex: 1, textAlign: 'center' }}>
-                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--medium)' }}>{h2h.draws}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Empates</div>
-                          </div>
-                          <div style={{ flex: 1, textAlign: 'center' }}>
-                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--low)' }}>{h2h.team2_wins}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Vitórias</div>
-                          </div>
-                          <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid var(--border)', paddingLeft: '8px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>{h2h.avg_goals}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Gols/jogo</div>
-                          </div>
-                        </div>
-                        {/* H2H bubbles */}
-                        <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center' }}>
-                          <H2HBubbles results={h2h.last5 ?? []} />
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sem histórico direto suficiente</div>
+                  {/* H2H Compacto — só aparece quando há dados */}
+                  {h2h && h2h.total >= 2 && (
+                    <div style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      marginBottom: '10px',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        H2H — últimos {h2h.total} confrontos
                       </div>
-                    )}
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--high)' }}>{h2h.team1_wins}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Vitórias</div>
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--medium)' }}>{h2h.draws}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Empates</div>
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--low)' }}>{h2h.team2_wins}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Vitórias</div>
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid var(--border)', paddingLeft: '8px' }}>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>{h2h.avg_goals}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Gols/jogo</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center' }}>
+                        <H2HBubbles results={h2h.last5 ?? []} />
+                      </div>
+                    </div>
+                  )}
 
                   {/* xG bars */}
                   <div className="xg-row">
@@ -334,7 +326,7 @@ export default function Dashboard() {
                       💡 Análise IA
                     </div>
                     {match.insights?.length > 0 ? (
-                      match.insights.slice(0, 2).map((insight: string, i: number) => (
+                      match.insights.slice(0, 5).map((insight: string, i: number) => (
                         <div key={i} style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', lineHeight: 1.4 }}>
                           {insight}
                         </div>
