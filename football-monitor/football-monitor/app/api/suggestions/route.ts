@@ -507,6 +507,9 @@ async function analyzeMatch(sb: any, match: any) {
     league_id,
     league_name:   match.league_name,
     date:          match.date,
+    status:        match.status,
+    goals_home:    match.goals_home,
+    goals_away:    match.goals_away,
     home_team:     translateTeamName(match.home_team_name),
     away_team:     translateTeamName(match.away_team_name),
     home_team_id:  match.home_team_id,
@@ -592,7 +595,7 @@ export async function GET(req: NextRequest) {
 
   let q = sb
     .from("matches")
-    .select("fixture_id,league_id,league_name,season,date,status,home_team_id,home_team_name,away_team_id,away_team_name");
+    .select("fixture_id,league_id,league_name,season,date,status,home_team_id,home_team_name,away_team_id,away_team_name,goals_home,goals_away");
 
   if (fixtureIdParam) {
     q = q.eq("fixture_id", fixtureIdParam);

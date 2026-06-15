@@ -164,7 +164,17 @@ export default function ConfrontoPage() {
           <span className="league-badge">{league}</span>
           {dateLabel && <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{dateLabel}</span>}
         </div>
-        <h1 className="page-title">{homeName} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '28px' }}>vs</span> {awayName}</h1>
+        <h1 className="page-title">
+          {homeName} 
+          {analysis?.status === 'FT' ? (
+            <span style={{ margin: '0 16px', color: 'var(--high)', fontSize: '32px', fontWeight: 800 }}>
+              {analysis.goals_home} <span style={{ fontSize: '20px', color: 'var(--text-muted)', margin: '0 4px' }}>x</span> {analysis.goals_away}
+            </span>
+          ) : (
+            <span style={{ margin: '0 16px', color: 'var(--text-muted)', fontWeight: 400, fontSize: '28px' }}>vs</span>
+          )}
+          {awayName}
+        </h1>
         <p className="page-subtitle">Análise completa do confronto baseada em dados históricos</p>
       </div>
 

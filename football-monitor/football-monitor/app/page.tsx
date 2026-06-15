@@ -240,7 +240,15 @@ export default function Dashboard() {
                         <H2HBubbles results={homeForm?.results} />
                       </div>
                     </div>
-                    <div className="match-vs">vs</div>
+                    <div className="match-vs">
+                      {match.status === 'FT' ? (
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--high)', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '6px' }}>
+                          {match.goals_home} <span style={{ margin: '0 4px', fontSize: '14px', color: 'var(--text-muted)' }}>x</span> {match.goals_away}
+                        </div>
+                      ) : (
+                        'vs'
+                      )}
+                    </div>
                     <div style={{ textAlign: 'center', flex: 1 }}>
                       <div className="team-name away">{match.away_team}</div>
                       <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'center' }}>
