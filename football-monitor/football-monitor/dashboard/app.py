@@ -203,7 +203,12 @@ st.sidebar.metric("Jogos Usados no Treinamento", len(df_finished_all))
 st.sidebar.metric("Jogos para Previsão", len(df_upcoming_all))
 
 # ── 5. Estrutura de Abas (Tabs) ──
-tab1, tab2, tab3 = st.tabs(["🌍 Radar Global (Value Bets)", "📊 Análise por Liga", "🔗 Construtor de Múltiplas"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🌍 Radar Global (Value Bets)",
+    "📊 Análise por Liga",
+    "🔗 Construtor de Múltiplas",
+    "🧪 Sanity Dashboard"
+])
 
 # ==========================================
 # ABA 1: RADAR GLOBAL
@@ -371,3 +376,311 @@ with tab3:
                 """, unsafe_allow_html=True)
         else:
             st.info("Nenhuma previsão processada.")
+
+
+# ==========================================
+# ABA 4: SANITY DASHBOARD
+# ==========================================
+
+@st.cache_data(ttl=900)  # Refresca a cada 15 minutos
+def load_audit_data():
+    """Carrega predições resolvidas da view v_audit_predictions."""
+    if not supabase_client:
+        return pd.DataFrame()
+    try:
+        # Busca todas as predições com aposta resolvida
+        response = supabase_client.table("predictions") \
+            .select(
+                "id,fixture_id,confidence_score,confidence_level,"
+                "suggested_bet,fair_odd,bookmaker_odd,stake,"
+                "actual_result,profit_loss,bet_resolved,resolved_at,"
+                "home_win_prob,draw_prob,away_win_prob,over25_prob,btts_prob,"
+                "model_version,created_at"
+            ) \
+            .eq("bet_resolved", True) \
+            .not_.is_("profit_loss", "null") \
+            .order("resolved_at", desc=False) \
+            .execute()
+        df = pd.DataFrame(response.data or [])
+        if not df.empty:
+            df["profit_loss"]    = pd.to_numeric(df["profit_loss"],    errors="coerce").fillna(0)
+            df["confidence_score"] = pd.to_numeric(df["confidence_score"], errors="coerce").fillna(0)
+            df["bookmaker_odd"]  = pd.to_numeric(df["bookmaker_odd"],  errors="coerce")
+            df["resolved_at"]    = pd.to_datetime(df["resolved_at"],   errors="coerce", utc=True)
+            df["created_at"]     = pd.to_datetime(df["created_at"],    errors="coerce", utc=True)
+            df["is_win"]         = df["profit_loss"] > 0
+            # Faixa de confiança para a Matriz de Calibração
+            bins   = [0, 60, 70, 80, 90, 101]
+            labels = ["<60", "60-70", "70-80", "80-90", "90+"]
+            df["confidence_band"] = pd.cut(
+                df["confidence_score"], bins=bins, labels=labels, right=False
+            )
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar dados de auditoria: {e}")
+        return pd.DataFrame()
+
+
+with tab4:
+    st.header("🧪 Sanity Dashboard — Auditoria da Inteligência")
+    st.markdown(
+        "Painel de auditoria automática: **fecha o ciclo** entre a predição e o resultado real. "
+        "Rode `python scripts/resolve_predictions.py` após os jogos encerrarem para popular os dados."
+    )
+
+    df_audit = load_audit_data()
+
+    if df_audit.empty:
+        st.info(
+            "⏳ Nenhuma predição resolvida ainda. "
+            "Execute `python scripts/generate_predictions.py` para gerar predições, "
+            "aguarde os jogos e rode `python scripts/resolve_predictions.py` para resolver."
+        )
+    else:
+        # ─────────────────────────────────────────────────────────────
+        # MÉTRICAS GLOBAIS
+        # ─────────────────────────────────────────────────────────────
+        total_bets   = len(df_audit)
+        total_greens = df_audit["is_win"].sum()
+        total_reds   = total_bets - total_greens
+        global_pnl   = df_audit["profit_loss"].sum()
+        global_roi   = (global_pnl / total_bets * 100) if total_bets > 0 else 0
+        win_rate     = (total_greens / total_bets * 100) if total_bets > 0 else 0
+
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("🎯 Apostas Resolvidas", f"{total_bets}")
+        m2.metric("✅ Greens", f"{total_greens} ({win_rate:.1f}%)")
+        m3.metric("❌ Reds",   f"{total_reds}")
+        m4.metric("💰 P&L Total",  f"{global_pnl:+.2f}u",
+                  delta=f"{global_pnl:+.2f}u",
+                  delta_color="normal" if global_pnl >= 0 else "inverse")
+        m5.metric("📈 ROI Global", f"{global_roi:+.1f}%",
+                  delta=f"{global_roi:+.1f}%",
+                  delta_color="normal" if global_roi >= 0 else "inverse")
+
+        st.divider()
+
+        # ─────────────────────────────────────────────────────────────
+        # SEÇÃO 1: GRÁFICO DE PNL CUMULATIVO
+        # ─────────────────────────────────────────────────────────────
+        st.subheader("📉 Curva de Capital (P&L Cumulativo)")
+        st.markdown(
+            "*Cada ponto representa o saldo acumulado após resolver uma aposta. "
+            "Uma curva ascendente indica edge real do modelo.*"
+        )
+
+        df_pnl = df_audit.sort_values("resolved_at").copy()
+        df_pnl["pnl_cumulativo"] = df_pnl["profit_loss"].cumsum()
+        df_pnl["aposta_n"]       = range(1, len(df_pnl) + 1)
+        df_pnl["cor"] = df_pnl["pnl_cumulativo"].apply(
+            lambda x: "#00ff88" if x >= 0 else "#ff4b4b"
+        )
+
+        fig_pnl = px.line(
+            df_pnl,
+            x="aposta_n",
+            y="pnl_cumulativo",
+            title="Curva de P&L Cumulativo (Unidades de Stake)",
+            labels={"aposta_n": "Nº de Apostas Resolvidas", "pnl_cumulativo": "Saldo (unidades)"},
+            color_discrete_sequence=["#00d4ff"],
+            hover_data=["suggested_bet", "profit_loss", "confidence_score"]
+        )
+        fig_pnl.add_hline(y=0, line_dash="dash", line_color="#888", annotation_text="Break-even")
+        fig_pnl.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="#1E212B",
+            paper_bgcolor="#1E212B",
+            font_color="#FAFAFA"
+        )
+        st.plotly_chart(fig_pnl, use_container_width=True)
+
+        st.divider()
+
+        # ─────────────────────────────────────────────────────────────
+        # SEÇÃO 2: MATRIZ DE CALIBRAÇÃO
+        # ─────────────────────────────────────────────────────────────
+        col_cal, col_por = st.columns([3, 2])
+
+        with col_cal:
+            st.subheader("🔬 Matriz de Calibração")
+            st.markdown(
+                "*Compara o **win rate esperado** (confidence score médio) vs "
+                "o **win rate real** por faixa. Um modelo bem calibrado terá barras alinhadas.*"
+            )
+
+            df_cal = df_audit.dropna(subset=["confidence_band"]).copy()
+            if not df_cal.empty:
+                cal_grouped = df_cal.groupby("confidence_band", observed=True).agg(
+                    total=("is_win", "count"),
+                    greens=("is_win", "sum"),
+                    conf_media=("confidence_score", "mean"),
+                    pnl_total=("profit_loss", "sum")
+                ).reset_index()
+                cal_grouped["win_rate_real"]     = cal_grouped["greens"] / cal_grouped["total"] * 100
+                cal_grouped["win_rate_esperado"] = cal_grouped["conf_media"]
+
+                fig_cal = px.bar(
+                    cal_grouped.melt(
+                        id_vars=["confidence_band", "total"],
+                        value_vars=["win_rate_esperado", "win_rate_real"],
+                        var_name="Tipo",
+                        value_name="Win Rate (%)"
+                    ),
+                    x="confidence_band",
+                    y="Win Rate (%)",
+                    color="Tipo",
+                    barmode="group",
+                    title="Win Rate Esperado vs Real por Faixa de Confiança",
+                    labels={"confidence_band": "Faixa de Confiança"},
+                    color_discrete_map={
+                        "win_rate_esperado": "#00d4ff",
+                        "win_rate_real":     "#00ff88"
+                    },
+                    text_auto=".0f"
+                )
+                fig_cal.update_layout(
+                    template="plotly_dark",
+                    plot_bgcolor="#1E212B",
+                    paper_bgcolor="#1E212B",
+                    font_color="#FAFAFA"
+                )
+                st.plotly_chart(fig_cal, use_container_width=True)
+
+                # Tabela detalhada
+                cal_grouped["win_rate_real"]     = cal_grouped["win_rate_real"].round(1)
+                cal_grouped["win_rate_esperado"] = cal_grouped["win_rate_esperado"].round(1)
+                cal_grouped["pnl_total"]         = cal_grouped["pnl_total"].round(2)
+                st.dataframe(
+                    cal_grouped[["confidence_band", "total", "greens",
+                                 "win_rate_esperado", "win_rate_real", "pnl_total"]]
+                    .rename(columns={
+                        "confidence_band":  "Faixa",
+                        "total":            "Total",
+                        "greens":           "Acertos",
+                        "win_rate_esperado": "WR Esperado (%)",
+                        "win_rate_real":    "WR Real (%)",
+                        "pnl_total":        "P&L (u)"
+                    }),
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("Dados insuficientes para a Matriz de Calibração.")
+
+        with col_por:
+            st.subheader("📊 P&L por Mercado")
+            df_por_mercado = df_audit.groupby("suggested_bet").agg(
+                total=("is_win", "count"),
+                greens=("is_win", "sum"),
+                pnl=("profit_loss", "sum")
+            ).reset_index()
+            df_por_mercado["win_rate"] = (df_por_mercado["greens"] / df_por_mercado["total"] * 100).round(1)
+            df_por_mercado["pnl"]     = df_por_mercado["pnl"].round(2)
+
+            fig_m = px.bar(
+                df_por_mercado,
+                x="suggested_bet",
+                y="pnl",
+                color="pnl",
+                color_continuous_scale=["#ff4b4b", "#888", "#00ff88"],
+                title="P&L Total por Mercado",
+                text_auto=".2f"
+            )
+            fig_m.update_layout(
+                template="plotly_dark",
+                plot_bgcolor="#1E212B",
+                paper_bgcolor="#1E212B",
+                font_color="#FAFAFA",
+                coloraxis_showscale=False
+            )
+            st.plotly_chart(fig_m, use_container_width=True)
+
+            st.dataframe(
+                df_por_mercado[["suggested_bet", "total", "greens", "win_rate", "pnl"]]
+                .rename(columns={
+                    "suggested_bet": "Mercado",
+                    "total":  "Total",
+                    "greens": "Acertos",
+                    "win_rate": "WR (%)",
+                    "pnl":    "P&L (u)"
+                }),
+                hide_index=True,
+                use_container_width=True
+            )
+
+        st.divider()
+
+        # ─────────────────────────────────────────────────────────────
+        # SEÇÃO 3: ALARME DE OVERFITTING
+        # ─────────────────────────────────────────────────────────────
+        st.subheader("🚨 Alarme de Overfitting")
+
+        # Janela deslizante: últimas 30 predições resolvidas
+        df_recent = df_audit.tail(30).copy()
+        recent_pnl      = df_recent["profit_loss"].sum()
+        recent_wins     = df_recent["is_win"].sum()
+        recent_total    = len(df_recent)
+        recent_win_rate = (recent_wins / recent_total * 100) if recent_total > 0 else 0
+        avg_conf_recent = df_recent["confidence_score"].mean()
+
+        alarm_col1, alarm_col2 = st.columns(2)
+
+        with alarm_col1:
+            st.markdown(f"""**Últimas {recent_total} apostas resolvidas:**""")
+            st.markdown(f"- P&L: `{recent_pnl:+.2f}u`")
+            st.markdown(f"- Win Rate Real: `{recent_win_rate:.1f}%`")
+            st.markdown(f"- Confiança Média do Modelo: `{avg_conf_recent:.1f}%`")
+
+        with alarm_col2:
+            # Diagnóstico automático
+            if recent_total < 10:
+                st.info("⏳ Dados insuficientes para diagnóstico (mínimo: 10 apostas).")
+            elif recent_pnl < -5 and avg_conf_recent > 70:
+                st.error(
+                    "⚠️ **ALERTA DE OVERFITTING DETECTADO!**\n\n"
+                    f"O modelo diz confiança de **{avg_conf_recent:.0f}%** mas o P&L real está em "
+                    f"**{recent_pnl:+.2f}u**. O modelo provavelmente **decorou os dados de treino** "
+                    "e não está generalizando para partidas reais."
+                )
+            elif recent_pnl < -2:
+                st.warning(
+                    f"⚠️ P&L negativo nas últimas {recent_total} apostas ({recent_pnl:+.2f}u). "
+                    "Monitore — pode ser variância ou indica overfitting emergente."
+                )
+            elif recent_pnl > 0 and recent_win_rate >= (avg_conf_recent * 0.8):
+                st.success(
+                    f"✅ **Modelo calibrado e com edge positivo!** "
+                    f"Win rate real ({recent_win_rate:.1f}%) é compatível com a confiança média "
+                    f"({avg_conf_recent:.0f}%). P&L: **{recent_pnl:+.2f}u**."
+                )
+            else:
+                st.info(
+                    f"Model em observação. P&L: {recent_pnl:+.2f}u | "
+                    f"Win Rate: {recent_win_rate:.1f}% | Confiança média: {avg_conf_recent:.0f}%"
+                )
+
+        st.divider()
+
+        # Tabela de histórico completo
+        with st.expander("📃 Histórico Completo de Predições Resolvidas"):
+            df_hist_display = df_audit[[
+                "resolved_at", "suggested_bet", "actual_result",
+                "confidence_score", "bookmaker_odd", "stake",
+                "profit_loss", "is_win", "model_version"
+            ]].copy()
+            df_hist_display["resolved_at"] = df_hist_display["resolved_at"].dt.strftime("%Y-%m-%d %H:%M")
+            df_hist_display["is_win"]      = df_hist_display["is_win"].map({True: "✅", False: "❌"})
+            df_hist_display["profit_loss"] = df_hist_display["profit_loss"].apply(lambda x: f"{x:+.2f}u")
+            df_hist_display = df_hist_display.rename(columns={
+                "resolved_at":     "Data",
+                "suggested_bet":   "Mercado",
+                "actual_result":   "Resultado Real",
+                "confidence_score": "Conf.",
+                "bookmaker_odd":   "Odd",
+                "stake":           "Stake",
+                "profit_loss":     "P&L",
+                "is_win":          "Status",
+                "model_version":   "Versão"
+            })
+            st.dataframe(df_hist_display, hide_index=True, use_container_width=True)
+

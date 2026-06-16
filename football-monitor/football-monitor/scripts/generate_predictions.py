@@ -33,8 +33,7 @@ import numpy as np
 from scipy.stats import poisson as scipy_poisson
 from dotenv import load_dotenv
 from supabase_client import supabase_client
-import tensorflow as tf
-import pickle
+# tensorflow e pickle são importados condicionalmente no bloco --use-nn
 
 # Carrega .env.local para obter GEMINI_API_KEY
 try:
@@ -742,8 +741,13 @@ def analyze_match(match: dict, ai_client) -> dict | None:
                 league_stats, h2h_summary
             )
 
-    def fair_odd(prob_pct: float) -> float | None:
+    def _fair_odd(prob_pct: float) -> float | None:
+        """Converte probabilidade (%) em odd justa decimal."""
         return round(100 / prob_pct, 2) if prob_pct > 1 else None
+
+    # ── Campos de Auditoria (Fase 2 — Log da Verdade) ──
+    # Congelados no momento zero, ANTES da bola rolar.
+    computed_fair_odd = _fair_odd(main_prob)
 
     return {
         "fixture_id":            match["fixture_id"],
@@ -765,6 +769,12 @@ def analyze_match(match: dict, ai_client) -> dict | None:
         "main_suggestion_prob":  round(main_prob, 2),
         "model_version":         MODEL_VERSION,
         "insights":              json.dumps(ai_insights, ensure_ascii=False) if ai_insights else None,
+        # ── Auditoria: congelado no momento zero ──
+        "suggested_bet":         main_market,          # ex: 'home_win', 'over25', 'btts_yes'
+        "fair_odd":              computed_fair_odd,     # odd justa pelo modelo
+        "bookmaker_odd":         computed_fair_odd,     # sem API externa: usa fair_odd por padrão
+        "stake":                 1.0,                   # 1 unidade padrão
+        "bet_resolved":          False,                 # aguardando resultado
     }
 
 
@@ -807,6 +817,8 @@ def main():
     # Carrega modelo NN se solicitado
     if USE_NN:
         try:
+            import tensorflow as tf
+            import pickle
             model_path = os.path.join(os.path.dirname(__file__), "..", "football_nn_model.keras")
             scaler_path = os.path.join(os.path.dirname(__file__), "..", "football_scaler.pkl")
             model = tf.keras.models.load_model(model_path)
