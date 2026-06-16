@@ -656,7 +656,7 @@ export async function GET(req: NextRequest) {
   } else {
     const startDt = new Date(`${dateParam}T00:00:00-03:00`).toISOString();
     const endDt   = new Date(`${dateParam}T23:59:59-03:00`).toISOString();
-    q = q.in("status", ["NS", "FT"]).gte("date", startDt).lte("date", endDt).order("date");
+    q = q.gte("date", startDt).lte("date", endDt).order("date");
     if (leagues?.length) q = q.in("league_id", leagues);
   }
 
