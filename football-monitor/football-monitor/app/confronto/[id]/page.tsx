@@ -163,7 +163,7 @@ function MarketLinesTable({ title, mean, minLine, maxLine, step = 1, defaultExpa
               <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Mais de {row.line}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.overProb)}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#FFF', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.overProb)}</span>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{row.overProb.toFixed(0)}%</span>
                 </div>
               </div>
@@ -171,7 +171,7 @@ function MarketLinesTable({ title, mean, minLine, maxLine, step = 1, defaultExpa
               <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Menos {row.line}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--medium)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.underProb)}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#FFF', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.underProb)}</span>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{row.underProb.toFixed(0)}%</span>
                 </div>
               </div>
@@ -431,7 +431,7 @@ export default function ConfrontoPage() {
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
                           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.label}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{s.fair_odd?.toFixed(2)}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#FFF', fontFamily: 'var(--font-mono)' }}>{s.fair_odd?.toFixed(2)}</span>
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{s.probability}%</span>
                           </div>
                         </div>
