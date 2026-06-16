@@ -425,10 +425,14 @@ export default function ConfrontoPage() {
                 {analysis.all_suggestions?.length > 1 && (
                   <div style={{ marginTop: '16px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outros mercados analisados</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {analysis.all_suggestions.map((s: any, i: number) => (
-                        <div key={i} style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                          {s.label} · {s.probability}% · odd {s.fair_odd?.toFixed(2)}
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.label}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{s.fair_odd?.toFixed(2)}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{s.probability}%</span>
+                          </div>
                         </div>
                       ))}
                     </div>
