@@ -154,24 +154,24 @@ function MarketLinesTable({ title, mean, minLine, maxLine, step = 1 }: { title: 
         <span>{title}</span>
       </div>
       
-      <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div style={{ marginTop: '12px' }}>
           {rows.map((row, i) => (
-            <div key={row.line} style={{ display: 'flex', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+            <div key={row.line} style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
               {/* OVER */}
-              <div style={{ flex: 1, minWidth: '130px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 12px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Mais de {row.line}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.overProb)}</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{row.overProb.toFixed(0)}%</span>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Mais de {row.line}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.overProb)}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{row.overProb.toFixed(0)}%</span>
                 </div>
               </div>
               {/* UNDER */}
-              <div style={{ flex: 1, minWidth: '130px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 12px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Menos de {row.line}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--medium)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.underProb)}</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{row.underProb.toFixed(0)}%</span>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Menos {row.line}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--medium)', fontFamily: 'var(--font-mono)' }}>{calcOdds(row.underProb)}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{row.underProb.toFixed(0)}%</span>
                 </div>
               </div>
             </div>
