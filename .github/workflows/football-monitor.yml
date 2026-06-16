@@ -1,0 +1,72 @@
+name: Football Monitor Pipeline
+
+on:
+  schedule:
+    # 08:00 no Brasil = 11:00 UTC
+    - cron: '0 11 * * *'
+    
+    # 02:00 no Brasil = 05:00 UTC
+    - cron: '0 5 * * *'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Modo de execução do orquestrador'
+        required: true
+        default: 'morning'
+        type: choice
+        options:
+          - morning
+          - resolve
+          - predict
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        # Importante: o diretório raiz do Git não é a pasta do Python,
+        # então forçamos todos os comandos "run" a rodarem na pasta correta.
+        working-directory: football-monitor/football-monitor
+        
+    steps:
+      - name: 📥 Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: ⚙️ Executar Football Monitor (Morning Pipeline)
+        if: github.event.schedule == '0 11 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'morning')
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/orchestrator.py --mode morning --days 3 --no-ai
+
+      - name: 🌙 Executar Resolução Noturna (Night Resolve)
+        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'resolve')
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python scripts/orchestrator.py --mode resolve
+          
+      - name: 🤖 Gerar Predições Manualmente (Predict Only)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'predict'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/orchestrator.py --mode predict --days 3 --no-ai
