@@ -11,18 +11,24 @@ const RESULT_COLORS = {
 };
 
 function StatBar({ label, homeVal, awayVal, format = (v: number) => `${v}`, higherIsBetter = true }: {
-  label: string; homeVal: number; awayVal: number; format?: (v: number) => string; higherIsBetter?: boolean;
+  label: string; homeVal: number | null; awayVal: number | null; format?: (v: number) => string; higherIsBetter?: boolean;
 }) {
-  const total = homeVal + awayVal || 1;
-  const homePct = (homeVal / total) * 100;
-  const awayPct = (awayVal / total) * 100;
-  const homeLeads = higherIsBetter ? homeVal >= awayVal : homeVal <= awayVal;
+  const h = homeVal ?? 0;
+  const a = awayVal ?? 0;
+  const total = h + a || 1;
+  const homePct = homeVal == null && awayVal == null ? 50 : (homeVal == null ? 0 : (awayVal == null ? 100 : (h / total) * 100));
+  const awayPct = homeVal == null && awayVal == null ? 50 : (awayVal == null ? 0 : (homeVal == null ? 100 : (a / total) * 100));
+  const homeLeads = higherIsBetter ? h >= a : h <= a;
+  
+  const displayHome = homeVal != null ? format(homeVal) : '—';
+  const displayAway = awayVal != null ? format(awayVal) : '—';
+
   return (
     <div style={{ marginBottom: '14px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '13px' }}>
-        <span style={{ color: homeLeads ? 'var(--accent-bright)' : 'var(--text-muted)', fontWeight: homeLeads ? 700 : 400 }}>{format(homeVal)}</span>
+        <span style={{ color: homeVal != null && homeLeads ? 'var(--accent-bright)' : 'var(--text-muted)', fontWeight: homeVal != null && homeLeads ? 700 : 400 }}>{displayHome}</span>
         <span style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
-        <span style={{ color: !homeLeads ? 'var(--medium)' : 'var(--text-muted)', fontWeight: !homeLeads ? 700 : 400 }}>{format(awayVal)}</span>
+        <span style={{ color: awayVal != null && !homeLeads ? 'var(--medium)' : 'var(--text-muted)', fontWeight: awayVal != null && !homeLeads ? 700 : 400 }}>{displayAway}</span>
       </div>
       <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', gap: '2px' }}>
         <div style={{ width: `${homePct}%`, background: 'var(--accent-bright)', borderRadius: '3px 0 0 3px', transition: 'width 0.6s ease' }} />
@@ -98,6 +104,76 @@ function estimatePossession(shots: number | null, corners: number | null, oppSho
   if (h === 0 && a === 0) return 50;
   const total = h + a;
   return Math.round((h / total) * 100);
+}
+
+// === Lógica de Distribuição de Poisson (Frontend) ===
+function factorial(n: number): number {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+function poissonPmf(k: number, lambda: number): number {
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
+function poissonCdf(k: number, lambda: number): number {
+  let cdf = 0;
+  for (let i = 0; i <= k; i++) cdf += poissonPmf(i, lambda);
+  return cdf;
+}
+function calcOdds(probPct: number): string {
+  if (probPct >= 99.5) return '1.01';
+  if (probPct <= 0.5) return '100.0';
+  const odd = 100 / probPct;
+  return odd.toFixed(2);
+}
+
+// Componente para Tabela Detalhada de Mercado (Over/Under)
+function MarketLinesTable({ title, mean, minLine, maxLine, step = 1 }: { title: string; mean: number; minLine: number; maxLine: number; step?: number }) {
+  const rows = [];
+  for (let line = minLine; line <= maxLine; line += step) {
+    // Probabilidade de MENOS DE (Under)
+    const k = Math.floor(line); // ex: line 8.5 -> floor é 8. P(X <= 8)
+    const underProb = poissonCdf(k, mean) * 100;
+    const overProb = 100 - underProb;
+    
+    rows.push({
+      line,
+      overProb,
+      underProb,
+    });
+  }
+
+  return (
+    <div style={{ marginBottom: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+      <div 
+        style={{ 
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+          padding: '14px 16px', background: 'rgba(255,255,255,0.01)', borderBottom: '1px solid var(--border)',
+          color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'
+        }}
+      >
+        <span>{title}</span>
+      </div>
+      
+      <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ marginTop: '12px' }}>
+          {rows.map((row, i) => (
+            <div key={row.line} style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+              {/* OVER */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Mais de {row.line}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-bright)', fontFamily: 'var(--font-mono)' }}>{row.overProb.toFixed(1)}%</span>
+              </div>
+              {/* UNDER */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Menos de {row.line}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--medium)', fontFamily: 'var(--font-mono)' }}>{row.underProb.toFixed(1)}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ConfrontoPage() {
@@ -182,8 +258,12 @@ export default function ConfrontoPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
         {/* === LINHA 1: Visão Geral (Probabilidades + IA) === */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-          {/* Probabilidades */}
+        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px' }}>
+          
+          {/* Coluna Esquerda: Dados e Tabelas */}
+          <div style={{ flex: '1 1 65%', minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+              {/* Probabilidades */}
           {analysis && (
             <div className="card">
               <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '18px' }}>
@@ -241,34 +321,116 @@ export default function ConfrontoPage() {
             </div>
           )}
 
-          {/* AI Insights */}
-          {analysis?.insights?.length > 0 && (
+
+          {/* Novos Mercados Alternativos */}
+          {analysis && analysis.prob_1x !== undefined && (
             <div className="card" style={{ height: 'fit-content' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '18px' }}>
-                Análise IA — Insights do Confronto
+                Mercados Alternativos (Seguros)
               </h3>
-              {analysis.insights.map((insight: string, i: number) => (
-                <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '12px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <div style={{ minWidth: '24px', height: '24px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: 'var(--accent-bright)' }}>
-                    {i + 1}
-                  </div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{insight}</p>
-                </div>
-              ))}
-              {analysis.all_suggestions?.length > 1 && (
-                <div style={{ marginTop: '16px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outros mercados analisados</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {analysis.all_suggestions.map((s: any, i: number) => (
-                      <div key={i} style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                        {s.label} · {s.probability}% · odd {s.fair_odd?.toFixed(2)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Dupla Chance</div>
+                <ProbBar label="Mandante ou Empate (1X)" value={analysis.prob_1x} color="var(--accent-bright)" />
+                <ProbBar label="Mandante ou Visitante (12)" value={analysis.prob_12} color="var(--high)" />
+                <ProbBar label="Visitante ou Empate (X2)" value={analysis.prob_x2} color="var(--medium)" />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Draw No Bet (Empate Anula)</div>
+                <ProbBar label={`DNB — ${homeName}`} value={analysis.prob_dnb_home} color="var(--accent-bright)" />
+                <ProbBar label={`DNB — ${awayName}`} value={analysis.prob_dnb_away} color="var(--medium)" />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Gols das Equipes</div>
+                <ProbBar label={`${homeName} Over 0.5 Gols`} value={analysis.prob_home_over05} color="var(--accent-bright)" />
+                <ProbBar label={`${homeName} Over 1.5 Gols`} value={analysis.prob_home_over15} color="var(--high)" />
+                <ProbBar label={`${awayName} Over 0.5 Gols`} value={analysis.prob_away_over05} color="var(--medium)" />
+                <ProbBar label={`${awayName} Over 1.5 Gols`} value={analysis.prob_away_over15} color="var(--low)" />
+              </div>
             </div>
           )}
+
+          {/* Mercados de Estatísticas / Físicos (Principal) */}
+          {analysis && analysis.corners_over85_prob !== undefined && (
+            <div className="card" style={{ height: 'fit-content' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '18px' }}>
+                Mercados de Estatísticas
+              </h3>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <span>🚩</span> Escanteios
+                </div>
+                <ProbBar label="Mais de 8.5 Escanteios" value={analysis.corners_over85_prob} color="var(--high)" />
+                <ProbBar label="Mais de 10.5 Escanteios" value={analysis.corners_over105_prob} color="var(--medium)" />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <span>🟨</span> Cartões
+                </div>
+                <ProbBar label="Mais de 4.5 Cartões" value={analysis.cards_over45_prob} color="var(--accent-bright)" />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <span>🎯</span> Chutes ao Alvo
+                </div>
+                <ProbBar label="Mais de 8.5 Chutes no Gol (SOG)" value={analysis.sog_over85_prob} color="var(--high)" />
+              </div>
+            </div>
+          )}
+          </div> {/* Fecha o grid interno (Probabilidades, Mercados, etc) */}
+
+          {/* Tabelas Expandidas de Linhas Completas */}
+          {analysis && analysis.goals_mean !== undefined && analysis.corners_mean !== undefined && (
+            <div className="card" style={{ height: 'fit-content' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '18px' }}>
+                Linhas Completas (Odds Justas)
+              </h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                <MarketLinesTable title="⚽ Total de Gols" mean={analysis.goals_mean} minLine={0.5} maxLine={5.5} defaultExpanded={true} />
+                <MarketLinesTable title="🚩 Escanteios" mean={analysis.corners_mean} minLine={5.5} maxLine={15.5} defaultExpanded={true} />
+                <MarketLinesTable title="🟨 Cartões" mean={analysis.cards_mean} minLine={2.5} maxLine={8.5} defaultExpanded={true} />
+                <MarketLinesTable title="🎯 Chutes ao Alvo" mean={analysis.sog_mean} minLine={5.5} maxLine={13.5} defaultExpanded={true} />
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* Coluna Direita: Análise IA */}
+          <div style={{ flex: '1 1 30%', minWidth: '320px', maxWidth: '400px' }}>
+            {analysis?.insights?.length > 0 && (
+              <div className="card" style={{ height: 'fit-content' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '18px' }}>
+                  Análise IA — Insights do Confronto
+                </h3>
+                {analysis.insights.map((insight: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '12px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ minWidth: '24px', height: '24px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: 'var(--accent-bright)' }}>
+                      {i + 1}
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{insight}</p>
+                  </div>
+                ))}
+                {analysis.all_suggestions?.length > 1 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outros mercados analisados</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {analysis.all_suggestions.map((s: any, i: number) => (
+                        <div key={i} style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                          {s.label} · {s.probability}% · odd {s.fair_odd?.toFixed(2)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* === LINHA 2: Scout Comparativo & H2H === */}
@@ -286,47 +448,47 @@ export default function ConfrontoPage() {
               </div>
 
               {/* Posse de Bola */}
-              {homePoss !== null && awayPoss !== null && (
+              {(homePoss !== null || awayPoss !== null) && (
                 <StatBar
                   label="Posse de Bola %"
                   homeVal={homePoss}
                   awayVal={awayPoss}
-                  format={v => `${v}%`}
+                  format={v => `${v.toFixed(0)}%`}
                 />
               )}
 
-              {hs?.avg_shots != null && as_?.avg_shots != null && (
-                <StatBar label="Chutes/jogo" homeVal={Number(hs.avg_shots.toFixed(1))} awayVal={Number(as_.avg_shots.toFixed(1))} format={v => v.toString()} />
+              {(hs?.avg_shots != null || as_?.avg_shots != null) && (
+                <StatBar label="Chutes/jogo" homeVal={hs?.avg_shots ?? null} awayVal={as_?.avg_shots ?? null} format={v => v.toFixed(1)} />
               )}
-              {hs?.avg_sog != null && as_?.avg_sog != null && (
-                <StatBar label="Chutes no alvo" homeVal={Number(hs.avg_sog.toFixed(1))} awayVal={Number(as_.avg_sog.toFixed(1))} format={v => v.toString()} />
+              {(hs?.avg_sog != null || as_?.avg_sog != null) && (
+                <StatBar label="Chutes no alvo" homeVal={hs?.avg_sog ?? null} awayVal={as_?.avg_sog ?? null} format={v => v.toFixed(1)} />
               )}
-              {hs?.avg_corners != null && as_?.avg_corners != null && (
-                <StatBar label="Escanteios/jogo" homeVal={Number(hs.avg_corners.toFixed(1))} awayVal={Number(as_.avg_corners.toFixed(1))} format={v => v.toString()} />
+              {(hs?.avg_corners != null || as_?.avg_corners != null) && (
+                <StatBar label="Escanteios/jogo" homeVal={hs?.avg_corners ?? null} awayVal={as_?.avg_corners ?? null} format={v => v.toFixed(1)} />
               )}
-              {hs?.avg_yellow_cards != null && as_?.avg_yellow_cards != null && (
+              {(hs?.avg_yellow_cards != null || as_?.avg_yellow_cards != null) && (
                 <StatBar
                   label="Cartões amarelos"
-                  homeVal={Number(hs.avg_yellow_cards.toFixed(2))}
-                  awayVal={Number(as_.avg_yellow_cards.toFixed(2))}
-                  format={v => v.toString()}
+                  homeVal={hs?.avg_yellow_cards ?? null}
+                  awayVal={as_?.avg_yellow_cards ?? null}
+                  format={v => v.toFixed(2)}
                   higherIsBetter={false}
                 />
               )}
-              {hs?.avg_goals_scored != null && as_?.avg_goals_scored != null && (
-                <StatBar label="Gols marcados/jogo" homeVal={Number(hs.avg_goals_scored.toFixed(2))} awayVal={Number(as_.avg_goals_scored.toFixed(2))} format={v => v.toString()} />
+              {(hs?.avg_goals_scored != null || as_?.avg_goals_scored != null) && (
+                <StatBar label="Gols marcados/jogo" homeVal={hs?.avg_goals_scored ?? null} awayVal={as_?.avg_goals_scored ?? null} format={v => v.toFixed(2)} />
               )}
-              {hs?.avg_goals_conceded != null && as_?.avg_goals_conceded != null && (
+              {(hs?.avg_goals_conceded != null || as_?.avg_goals_conceded != null) && (
                 <StatBar
                   label="Gols sofridos/jogo"
-                  homeVal={Number(hs.avg_goals_conceded.toFixed(2))}
-                  awayVal={Number(as_.avg_goals_conceded.toFixed(2))}
-                  format={v => v.toString()}
+                  homeVal={hs?.avg_goals_conceded ?? null}
+                  awayVal={as_?.avg_goals_conceded ?? null}
+                  format={v => v.toFixed(2)}
                   higherIsBetter={false}
                 />
               )}
-              {hs?.over25_pct != null && as_?.over25_pct != null && (
-                <StatBar label="Over 2.5 (histórico %)" homeVal={Number(hs.over25_pct)} awayVal={Number(as_.over25_pct)} format={v => `${v}%`} />
+              {(hs?.over25_pct != null || as_?.over25_pct != null) && (
+                <StatBar label="Over 2.5 (histórico %)" homeVal={hs?.over25_pct ?? null} awayVal={as_?.over25_pct ?? null} format={v => `${v}%`} />
               )}
             </div>
           )}

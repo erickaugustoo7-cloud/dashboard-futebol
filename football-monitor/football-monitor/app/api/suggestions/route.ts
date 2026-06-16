@@ -105,6 +105,9 @@ function quickPoisson(homeXg: number, awayXg: number, maxGoals = 6) {
       matrix[i][j] /= total;
 
   let homeWin = 0, draw = 0, awayWin = 0, over25 = 0, btts = 0;
+  let homeOver05 = 0, homeOver15 = 0;
+  let awayOver05 = 0, awayOver15 = 0;
+  
   for (let i = 0; i < maxGoals; i++) {
     for (let j = 0; j < maxGoals; j++) {
       const p = matrix[i][j];
@@ -113,9 +116,23 @@ function quickPoisson(homeXg: number, awayXg: number, maxGoals = 6) {
       else awayWin += p;
       if (i + j > 2.5) over25 += p;
       if (i > 0 && j > 0) btts += p;
+      
+      if (i > 0) homeOver05 += p;
+      if (i > 1) homeOver15 += p;
+      if (j > 0) awayOver05 += p;
+      if (j > 1) awayOver15 += p;
     }
   }
-  return { homeWin, draw, awayWin, over25, btts };
+  return { homeWin, draw, awayWin, over25, btts, homeOver05, homeOver15, awayOver05, awayOver15 };
+}
+
+// CDF Poisson
+function poissonCdf(k: number, lambda: number): number {
+  let cdf = 0;
+  for (let i = 0; i <= k; i++) {
+    cdf += poissonPmf(i, lambda);
+  }
+  return cdf;
 }
 
 async function getTeamStats(sb: any, teamId: number, leagueId: number, season: number) {
@@ -444,6 +461,19 @@ async function analyzeMatch(sb: any, match: any) {
   let awayWinP = (adjAwayWin / sumAdj) * 100;
   let over25P  = probs.over25 * 100;
   let bttsP    = probs.btts * 100;
+  
+  let dnbHomeP = (homeWinP / (homeWinP + awayWinP)) * 100;
+  let dnbAwayP = (awayWinP / (homeWinP + awayWinP)) * 100;
+
+  // Usa as estatísticas em dbPred (salvas pelo script Python) se existirem, senão calcula no fly.
+  const cornersMean = (homeStats?.avg_corners || 4.5) + (awayStats?.avg_corners || 4.5);
+  const cardsMean   = (homeStats?.avg_yellow_cards || 2.0) + (awayStats?.avg_yellow_cards || 2.0);
+  const sogMean     = (homeStats?.avg_sog || 4.0) + (awayStats?.avg_sog || 4.0);
+
+  const cornersOver85 = dbPred?.corners_over85_prob || (1 - poissonCdf(8, cornersMean)) * 100;
+  const cornersOver105 = dbPred?.corners_over105_prob || (1 - poissonCdf(10, cornersMean)) * 100;
+  const cardsOver45 = dbPred?.cards_over45_prob || (1 - poissonCdf(4, cardsMean)) * 100;
+  const sogOver85 = dbPred?.sog_over85_prob || (1 - poissonCdf(8, sogMean)) * 100;
 
   // Gera insights textuais (fallback)
   let insights = generateInsight(
@@ -521,6 +551,30 @@ async function analyzeMatch(sb: any, match: any) {
     away_win_prob: Math.round(awayWinP * 10) / 10,
     over25_prob:   Math.round(over25P * 10) / 10,
     btts_prob:     Math.round(bttsP * 10) / 10,
+    
+    prob_1x:       Math.round((homeWinP + drawP) * 10) / 10,
+    prob_x2:       Math.round((awayWinP + drawP) * 10) / 10,
+    prob_12:       Math.round((homeWinP + awayWinP) * 10) / 10,
+    prob_dnb_home: Math.round(dnbHomeP * 10) / 10,
+    prob_dnb_away: Math.round(dnbAwayP * 10) / 10,
+    
+    prob_home_over05: Math.round((dbPred?.prob_home_over05 || probs.homeOver05 * 100) * 10) / 10,
+    prob_home_over15: Math.round((dbPred?.prob_home_over15 || probs.homeOver15 * 100) * 10) / 10,
+    prob_away_over05: Math.round((dbPred?.prob_away_over05 || probs.awayOver05 * 100) * 10) / 10,
+    prob_away_over15: Math.round((dbPred?.prob_away_over15 || probs.awayOver15 * 100) * 10) / 10,
+
+    corners_over85_prob:  Math.round(cornersOver85 * 10) / 10,
+    corners_over105_prob: Math.round(cornersOver105 * 10) / 10,
+    cards_over45_prob:    Math.round(cardsOver45 * 10) / 10,
+    sog_over85_prob:      Math.round(sogOver85 * 10) / 10,
+
+    corners_mean:  Math.round(cornersMean * 100) / 100,
+    cards_mean:    Math.round(cardsMean * 100) / 100,
+    sog_mean:      Math.round(sogMean * 100) / 100,
+    goals_mean:    Math.round((homeXg + awayXg) * 100) / 100,
+    home_goals_mean: Math.round(homeXg * 100) / 100,
+    away_goals_mean: Math.round(awayXg * 100) / 100,
+
     home_elo:      eloH,
     away_elo:      eloA,
     home_form:     homeFormSummary,
@@ -528,38 +582,38 @@ async function analyzeMatch(sb: any, match: any) {
     h2h:           h2hSummary,
     insights,
     // ─── Scout stats de cada time ────────────────────────────────────────
-    home_scout: homeStats ? {
-      avg_shots:         homeStats.avg_shots          ?? null,
-      avg_sog:           homeStats.avg_sog             ?? null,
-      avg_corners:       homeStats.avg_corners         ?? null,
-      avg_yellow_cards:  homeStats.avg_yellow_cards    ?? null,
-      avg_goals_scored:  homeStats.avg_goals_scored    ?? null,
-      avg_goals_conceded:homeStats.avg_goals_conceded  ?? null,
-      over25_pct:        homeStats.over25_pct          ?? null,
-      btts_pct:          homeStats.btts_pct            ?? null,
-      home_win_pct:      homeStats.home_win_pct        ?? null,
-      away_win_pct:      homeStats.away_win_pct        ?? null,
-      attack_strength:   homeStats.attack_strength_home ?? null,
-      defense_strength:  homeStats.defense_strength_home ?? null,
-      total_matches:     homeStats.total_matches       ?? null,
-      fatigue_score:     homeStats.fatigue_score       ?? null,
-    } : null,
-    away_scout: awayStats ? {
-      avg_shots:         awayStats.avg_shots           ?? null,
-      avg_sog:           awayStats.avg_sog             ?? null,
-      avg_corners:       awayStats.avg_corners         ?? null,
-      avg_yellow_cards:  awayStats.avg_yellow_cards    ?? null,
-      avg_goals_scored:  awayStats.avg_goals_scored    ?? null,
-      avg_goals_conceded:awayStats.avg_goals_conceded  ?? null,
-      over25_pct:        awayStats.over25_pct          ?? null,
-      btts_pct:          awayStats.btts_pct            ?? null,
-      home_win_pct:      awayStats.home_win_pct        ?? null,
-      away_win_pct:      awayStats.away_win_pct        ?? null,
-      attack_strength:   awayStats.attack_strength_away ?? null,
-      defense_strength:  awayStats.defense_strength_away ?? null,
-      total_matches:     awayStats.total_matches       ?? null,
-      fatigue_score:     awayStats.fatigue_score       ?? null,
-    } : null,
+    home_scout: {
+      avg_shots:         homeStats?.avg_shots          ?? null,
+      avg_sog:           homeStats?.avg_sog             ?? null,
+      avg_corners:       homeStats?.avg_corners         ?? null,
+      avg_yellow_cards:  homeStats?.avg_yellow_cards    ?? null,
+      avg_goals_scored:  homeStats?.avg_goals_scored    ?? null,
+      avg_goals_conceded:homeStats?.avg_goals_conceded  ?? null,
+      over25_pct:        homeStats?.over25_pct          ?? null,
+      btts_pct:          homeStats?.btts_pct            ?? null,
+      home_win_pct:      homeStats?.home_win_pct        ?? null,
+      away_win_pct:      homeStats?.away_win_pct        ?? null,
+      attack_strength:   homeStats?.attack_strength_home ?? null,
+      defense_strength:  homeStats?.defense_strength_home ?? null,
+      total_matches:     homeStats?.total_matches       ?? null,
+      fatigue_score:     homeStats?.fatigue_score       ?? null,
+    },
+    away_scout: {
+      avg_shots:         awayStats?.avg_shots           ?? null,
+      avg_sog:           awayStats?.avg_sog             ?? null,
+      avg_corners:       awayStats?.avg_corners         ?? null,
+      avg_yellow_cards:  awayStats?.avg_yellow_cards    ?? null,
+      avg_goals_scored:  awayStats?.avg_goals_scored    ?? null,
+      avg_goals_conceded:awayStats?.avg_goals_conceded  ?? null,
+      over25_pct:        awayStats?.over25_pct          ?? null,
+      btts_pct:          awayStats?.btts_pct            ?? null,
+      home_win_pct:      awayStats?.home_win_pct        ?? null,
+      away_win_pct:      awayStats?.away_win_pct        ?? null,
+      attack_strength:   awayStats?.attack_strength_away ?? null,
+      defense_strength:  awayStats?.defense_strength_away ?? null,
+      total_matches:     awayStats?.total_matches       ?? null,
+      fatigue_score:     awayStats?.fatigue_score       ?? null,
+    },
     // ─────────────────────────────────────────────────────────────────────
     suggestion: {
       market:           best.market,

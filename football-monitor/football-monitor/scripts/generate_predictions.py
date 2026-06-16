@@ -155,7 +155,7 @@ def fetch_league_stats(league_id: int, season: int) -> dict:
 def fetch_team_stats_cache(team_id: int, league_id: int, season: int) -> dict:
     """Busca ELO e forças de ataque/defesa do cache."""
     result = supabase_client.table("team_stats_cache") \
-        .select("elo_rating,attack_strength_home,defense_strength_home,attack_strength_away,defense_strength_away,total_matches") \
+        .select("elo_rating,attack_strength_home,defense_strength_home,attack_strength_away,defense_strength_away,total_matches,avg_corners,avg_yellow_cards,avg_sog") \
         .eq("team_id", team_id) \
         .eq("league_id", league_id) \
         .eq("season", season) \
@@ -333,6 +333,25 @@ def matrix_to_probs(matrix: np.ndarray) -> dict:
     over35 = float(sum(matrix[i, j] for i in range(MAX_GOALS) for j in range(MAX_GOALS) if i + j > 3.5))
     btts   = float(sum(matrix[i, j] for i in range(1, MAX_GOALS) for j in range(1, MAX_GOALS)))
 
+    # Novos Mercados
+    prob_1x = min(home_win + draw, 1.0)
+    prob_12 = min(home_win + away_win, 1.0)
+    prob_x2 = min(away_win + draw, 1.0)
+    
+    prob_dnb_home = home_win / (home_win + away_win) if (home_win + away_win) > 0 else 0.5
+    prob_dnb_away = away_win / (home_win + away_win) if (home_win + away_win) > 0 else 0.5
+
+    # Home Over 0.5 e 1.5
+    home_over05 = float(sum(matrix[i, j] for i in range(1, MAX_GOALS) for j in range(MAX_GOALS)))
+    home_over15 = float(sum(matrix[i, j] for i in range(2, MAX_GOALS) for j in range(MAX_GOALS)))
+    
+    # Away Over 0.5 e 1.5
+    away_over05 = float(sum(matrix[i, j] for i in range(MAX_GOALS) for j in range(1, MAX_GOALS)))
+    away_over15 = float(sum(matrix[i, j] for i in range(MAX_GOALS) for j in range(2, MAX_GOALS)))
+    
+    # Ambas Marcam ou Mais de 2.5
+    btts_or_over25 = float(sum(matrix[i, j] for i in range(MAX_GOALS) for j in range(MAX_GOALS) if (i > 0 and j > 0) or (i + j > 2.5)))
+
     idx = np.unravel_index(np.argmax(matrix), matrix.shape)
 
     return {
@@ -343,6 +362,16 @@ def matrix_to_probs(matrix: np.ndarray) -> dict:
         "over25":   min(over25, 1.0),
         "over35":   min(over35, 1.0),
         "btts":     min(btts, 1.0),
+        "prob_1x": prob_1x,
+        "prob_12": prob_12,
+        "prob_x2": prob_x2,
+        "prob_dnb_home": prob_dnb_home,
+        "prob_dnb_away": prob_dnb_away,
+        "home_over05": min(home_over05, 1.0),
+        "home_over15": min(home_over15, 1.0),
+        "away_over05": min(away_over05, 1.0),
+        "away_over15": min(away_over15, 1.0),
+        "btts_or_over25": min(btts_or_over25, 1.0),
         "likely_score_home": int(idx[0]),
         "likely_score_away": int(idx[1]),
     }
@@ -667,6 +696,28 @@ def analyze_match(match: dict, ai_client) -> dict | None:
     matrix = poisson_matrix(home_xg, away_xg)
     probs  = matrix_to_probs(matrix)
 
+    # Probabilidades Extras (Estatísticas: Escanteios, Cartões, Chutes)
+    def prob_over(mean_val, threshold):
+        if not mean_val:
+            return 0.0
+        return float(1 - scipy_poisson.cdf(int(threshold), mean_val))
+
+    avg_corners_h = float(home_stats.get("avg_corners") or 4.5)
+    avg_corners_a = float(away_stats.get("avg_corners") or 4.5)
+    corners_mean = avg_corners_h + avg_corners_a
+    probs["corners_over85_prob"] = prob_over(corners_mean, 8)
+    probs["corners_over105_prob"] = prob_over(corners_mean, 10)
+
+    avg_cards_h = float(home_stats.get("avg_yellow_cards") or 2.0)
+    avg_cards_a = float(away_stats.get("avg_yellow_cards") or 2.0)
+    cards_mean = avg_cards_h + avg_cards_a
+    probs["cards_over45_prob"] = prob_over(cards_mean, 4)
+
+    avg_sog_h = float(home_stats.get("avg_sog") or 4.0)
+    avg_sog_a = float(away_stats.get("avg_sog") or 4.0)
+    sog_mean = avg_sog_h + avg_sog_a
+    probs["sog_over85_prob"] = prob_over(sog_mean, 8)
+
     # If NN model is enabled, combine its predictions with Poisson probabilities
     if USE_NN and model is not None and scaler is not None:
         try:
@@ -769,6 +820,23 @@ def analyze_match(match: dict, ai_client) -> dict | None:
         "main_suggestion_prob":  round(main_prob, 2),
         "model_version":         MODEL_VERSION,
         "insights":              json.dumps(ai_insights, ensure_ascii=False) if ai_insights else None,
+        
+        # Novos Mercados
+        "prob_1x":               round(probs.get("prob_1x", 0) * 100, 2),
+        "prob_12":               round(probs.get("prob_12", 0) * 100, 2),
+        "prob_x2":               round(probs.get("prob_x2", 0) * 100, 2),
+        "prob_dnb_home":         round(probs.get("prob_dnb_home", 0) * 100, 2),
+        "prob_dnb_away":         round(probs.get("prob_dnb_away", 0) * 100, 2),
+        "prob_home_over05":      round(probs.get("home_over05", 0) * 100, 2),
+        "prob_home_over15":      round(probs.get("home_over15", 0) * 100, 2),
+        "prob_away_over05":      round(probs.get("away_over05", 0) * 100, 2),
+        "prob_away_over15":      round(probs.get("away_over15", 0) * 100, 2),
+        "prob_btts_or_over25":   round(probs.get("btts_or_over25", 0) * 100, 2),
+        "corners_over85_prob":   round(probs.get("corners_over85_prob", 0) * 100, 2),
+        "corners_over105_prob":  round(probs.get("corners_over105_prob", 0) * 100, 2),
+        "cards_over45_prob":     round(probs.get("cards_over45_prob", 0) * 100, 2),
+        "sog_over85_prob":       round(probs.get("sog_over85_prob", 0) * 100, 2),
+
         # ── Auditoria: congelado no momento zero ──
         "suggested_bet":         main_market,          # ex: 'home_win', 'over25', 'btts_yes'
         "fair_odd":              computed_fair_odd,     # odd justa pelo modelo

@@ -1,0 +1,132 @@
+2026-06-16 08:08:37 [INFO] Pipeline iniciado — modo=morning | python=C:\Users\user\AppData\Local\Programs\Python\Python313\python.exe
+2026-06-16 08:08:37 [INFO] Diretório base: C:\Users\user\Documents\PROJETO X\files\football-monitor\football-monitor
+2026-06-16 08:08:37 [INFO] MODO: MORNING PIPELINE (pipeline completo)
+2026-06-16 08:08:37 [INFO] ============================================================
+2026-06-16 08:08:37 [INFO] ▶  INICIANDO: Sync de Partidas (ESPN)
+2026-06-16 08:08:37 [INFO]    Comando: C:\Users\user\AppData\Local\Programs\Python\Python313\python.exe C:\Users\user\Documents\PROJETO X\files\football-monitor\football-monitor\scripts\sync_recent.py
+2026-06-16 08:08:37 [INFO] ============================================================
+2026-06-16 08:14:58 [INFO]    ======================================================================
+2026-06-16 08:14:58 [INFO]     COMPUTE TEAM & LEAGUE STATS
+2026-06-16 08:14:58 [INFO]    ======================================================================
+2026-06-16 08:14:58 [INFO]    [1/5] Buscando jogos do Supabase...
+2026-06-16 08:14:58 [INFO]        -> 13120 jogos carregados.
+2026-06-16 08:14:58 [INFO]    [2/5] Calculando estatísticas por liga...
+2026-06-16 08:14:58 [INFO]        -> 57 combinações liga/temporada calculadas.
+2026-06-16 08:14:58 [INFO]    [3/5] Calculando ELO ratings...
+2026-06-16 08:14:58 [INFO]        -> ELO calculado para 805 times.
+2026-06-16 08:14:58 [INFO]    [4/5] Calculando estatísticas por time...
+2026-06-16 08:14:58 [INFO]        -> 2508 registros de times calculados.
+2026-06-16 08:14:58 [INFO]    [5a/5] Salvando 57 stats de liga no Supabase...
+2026-06-16 08:14:58 [INFO]        -> OK!
+2026-06-16 08:14:58 [INFO]    [5b/5] Salvando 2508 stats de times no Supabase...
+2026-06-16 08:14:58 [INFO]        -> 2508 registros salvos!
+2026-06-16 08:14:58 [INFO]    [5c/5] Calculando perfil global dos times (cross-liga)...
+2026-06-16 08:14:58 [INFO]        -> 587 perfis globais calculados.
+2026-06-16 08:14:58 [INFO]    [5b/5] Salvando 587 stats de times no Supabase...
+2026-06-16 08:14:58 [INFO]        -> 587 registros salvos!
+2026-06-16 08:14:58 [INFO]    ======================================================================
+2026-06-16 08:14:58 [INFO]     CONCLUIDO COM SUCESSO!
+2026-06-16 08:14:58 [INFO]      Ligas calculadas: 57
+2026-06-16 08:14:58 [INFO]      Times calculados: 2508
+2026-06-16 08:14:58 [INFO]    ======================================================================
+2026-06-16 08:14:58 [INFO]    =====================================================
+2026-06-16 08:14:58 [INFO]     🚀 INICIANDO SYNC DE JOGOS RECENTES
+2026-06-16 08:14:58 [INFO]    =====================================================
+2026-06-16 08:14:58 [INFO]    Dias de busca: 2026-06-13 até 2026-06-23
+2026-06-16 08:14:58 [INFO]    ✅ fifa.world: 44 jogos atualizados.
+2026-06-16 08:14:58 [INFO]    🎉 SYNC DE PARTIDAS CONCLUÍDO! Total atualizado: 44
+2026-06-16 08:14:58 [INFO]    =====================================================
+2026-06-16 08:14:58 [INFO]     🧠 INICIANDO APRENDIZADO DO MODELO (Recálculo de ELO)
+2026-06-16 08:14:58 [INFO]    =====================================================
+2026-06-16 08:14:58 [INFO]    ✅ Aprendizado concluído com sucesso!
+2026-06-16 08:14:58 [INFO] ✓  Sync de Partidas (ESPN) concluído em 380s
+2026-06-16 08:14:58 [INFO] ============================================================
+2026-06-16 08:14:58 [INFO] ▶  INICIANDO: Recálculo de ELO/Stats
+2026-06-16 08:14:58 [INFO]    Comando: C:\Users\user\AppData\Local\Programs\Python\Python313\python.exe C:\Users\user\Documents\PROJETO X\files\football-monitor\football-monitor\scripts\compute_team_stats.py
+2026-06-16 08:14:58 [INFO] ============================================================
+2026-06-16 08:18:09 [INFO]    ======================================================================
+2026-06-16 08:18:09 [INFO]     COMPUTE TEAM & LEAGUE STATS
+2026-06-16 08:18:09 [INFO]    ======================================================================
+2026-06-16 08:18:09 [INFO]    [1/5] Buscando jogos do Supabase...
+2026-06-16 08:18:09 [INFO]        -> 13120 jogos carregados.
+2026-06-16 08:18:09 [INFO]    [2/5] Calculando estatísticas por liga...
+2026-06-16 08:18:09 [INFO]        -> 57 combinações liga/temporada calculadas.
+2026-06-16 08:18:09 [INFO]    [3/5] Calculando ELO ratings...
+2026-06-16 08:18:09 [INFO]        -> ELO calculado para 805 times.
+2026-06-16 08:18:09 [INFO]    [4/5] Calculando estatísticas por time...
+2026-06-16 08:18:09 [INFO]        -> 2508 registros de times calculados.
+2026-06-16 08:18:09 [INFO]    [5a/5] Salvando 57 stats de liga no Supabase...
+2026-06-16 08:18:09 [INFO]        -> OK!
+2026-06-16 08:18:09 [INFO]    [5b/5] Salvando 2508 stats de times no Supabase...
+2026-06-16 08:18:09 [INFO]        -> 2508 registros salvos!
+2026-06-16 08:18:09 [INFO]    [5c/5] Calculando perfil global dos times (cross-liga)...
+2026-06-16 08:18:09 [INFO]        -> 587 perfis globais calculados.
+2026-06-16 08:18:09 [INFO]    [5b/5] Salvando 587 stats de times no Supabase...
+2026-06-16 08:18:09 [INFO]        -> 587 registros salvos!
+2026-06-16 08:18:09 [INFO]    ======================================================================
+2026-06-16 08:18:09 [INFO]     CONCLUIDO COM SUCESSO!
+2026-06-16 08:18:09 [INFO]      Ligas calculadas: 57
+2026-06-16 08:18:09 [INFO]      Times calculados: 2508
+2026-06-16 08:18:09 [INFO]    ======================================================================
+2026-06-16 08:18:09 [INFO] ✓  Recálculo de ELO/Stats concluído em 190s
+2026-06-16 08:18:09 [INFO] ============================================================
+2026-06-16 08:18:09 [INFO] ▶  INICIANDO: Resolução de Predições P&L
+2026-06-16 08:18:09 [INFO]    Comando: C:\Users\user\AppData\Local\Programs\Python\Python313\python.exe C:\Users\user\Documents\PROJETO X\files\football-monitor\football-monitor\scripts\resolve_predictions.py --hours 36
+2026-06-16 08:18:09 [INFO] ============================================================
+2026-06-16 08:18:12 [INFO]    ============================================================
+2026-06-16 08:18:12 [INFO]      RESOLVE PREDICTIONS — Motor de Resolução P&L
+2026-06-16 08:18:12 [INFO]    ============================================================
+2026-06-16 08:18:12 [INFO]    [1/4] Buscando jogos finalizados nas últimas 36h...
+2026-06-16 08:18:12 [INFO]        -> 5 jogos finalizados encontrados.
+2026-06-16 08:18:12 [INFO]    [2/4] Buscando predições pendentes...
+2026-06-16 08:18:12 [INFO]        -> 12 predições pendentes encontradas.
+2026-06-16 08:18:12 [INFO]    [3/4] Cruzando dados (Pandas merge por fixture_id)...
+2026-06-16 08:18:12 [INFO]        -> 0 predições com jogos finalizados para resolver.
+2026-06-16 08:18:12 [INFO]    ⏳ Nenhuma predição cruzou com jogos finalizados nesta janela.
+2026-06-16 08:18:12 [INFO]       Os jogos podem ainda não ter terminado.
+2026-06-16 08:18:12 [INFO] ✓  Resolução de Predições P&L concluído em 3s
+2026-06-16 08:18:12 [INFO] ============================================================
+2026-06-16 08:18:12 [INFO] ▶  INICIANDO: Geração de Predições
+2026-06-16 08:18:12 [INFO]    Comando: C:\Users\user\AppData\Local\Programs\Python\Python313\python.exe C:\Users\user\Documents\PROJETO X\files\football-monitor\football-monitor\scripts\generate_predictions.py --days 3
+2026-06-16 08:18:12 [INFO] ============================================================
+2026-06-16 08:18:40 [INFO]    ======================================================================
+2026-06-16 08:18:40 [INFO]      GENERATE PREDICTIONS  (v3.0-ai)
+2026-06-16 08:18:40 [INFO]    ======================================================================
+2026-06-16 08:18:40 [INFO]    [0/6] Inicializando Groq AI (Llama 3)...
+2026-06-16 08:18:40 [INFO]        [IA] Aviso: Nao foi possivel inicializar Groq: No module named 'groq'
+2026-06-16 08:18:40 [INFO]        -> Groq indisponivel. Rodando sem IA.
+2026-06-16 08:18:40 [INFO]    [1/6] Buscando jogos agendados para os proximos 3 dias...
+2026-06-16 08:18:40 [INFO]        -> 12 jogos encontrados.
+2026-06-16 08:18:40 [INFO]    [2/6] Analisando 12 partidas...
+2026-06-16 08:18:40 [INFO]          Fontes: ultimos 10 jogos reais + H2H (10) + Poisson + ELO + IA
+2026-06-16 08:18:40 [INFO]        [01/12] France vs Senegal | conf=55 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [02/12] Iraq vs Norway | conf=40 (low) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [03/12] Argentina vs Algeria | conf=59 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [04/12] Austria vs Jordan | conf=67 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [05/12] Portugal vs Congo DR | conf=55 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [06/12] England vs Croatia | conf=58 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [07/12] Ghana vs Panama | conf=52 (low) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [08/12] Uzbekistan vs Colombia | conf=44 (low) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [09/12] Czechia vs South Africa | conf=57 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [10/12] Switzerland vs Bosnia-Herzegovina | conf=47 (low) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [11/12] Canada vs Qatar | conf=52 (low) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        [12/12] Mexico vs South Korea | conf=60 (medium) | IA: sem IA
+2026-06-16 08:18:40 [INFO]        -> 12 previsoes geradas. (0 erros)
+2026-06-16 08:18:40 [INFO]    [3/6] Salvando 12 previsoes no Supabase...
+2026-06-16 08:18:40 [INFO]    ======================================================================
+2026-06-16 08:18:40 [INFO]      CONCLUIDO!
+2026-06-16 08:18:40 [INFO]      Total analisado  : 12 jogos
+2026-06-16 08:18:40 [INFO]      Previsoes salvas : 12
+2026-06-16 08:18:40 [INFO]      Alta confianca   : 0 | Media: 7 | Baixa: 5
+2026-06-16 08:18:40 [INFO]      Com insights IA  : 0 jogos
+2026-06-16 08:18:40 [INFO]    ======================================================================
+2026-06-16 08:18:40 [INFO] ✓  Geração de Predições concluído em 28s
+2026-06-16 08:18:40 [INFO] ============================================================
+2026-06-16 08:18:40 [INFO]   RESUMO DO PIPELINE
+2026-06-16 08:18:40 [INFO] ============================================================
+2026-06-16 08:18:40 [INFO]   ✓  sync                 OK
+2026-06-16 08:18:40 [INFO]   ✓  stats                OK
+2026-06-16 08:18:40 [INFO]   ✓  resolve              OK
+2026-06-16 08:18:40 [INFO]   ✓  predict              OK
+2026-06-16 08:18:40 [INFO]   → Pipeline finalizado COM SUCESSO ✅
+2026-06-16 08:18:40 [INFO] ============================================================
