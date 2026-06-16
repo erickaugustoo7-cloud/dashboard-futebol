@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync-matches?leagues=71,39,140,135,78,61,2",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/sync-matches?leagues=3,13,11,73,1,9,4",
+      "schedule": "5 8 * * *"
+    }
+  ]
+}
