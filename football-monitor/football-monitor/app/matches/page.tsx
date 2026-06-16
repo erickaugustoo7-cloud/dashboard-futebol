@@ -17,11 +17,10 @@ function getStatusInfo(status: string) {
 }
 
 function formatTime(isoDate: string) {
-  try {
-    return isoDate.substring(11, 16);
-  } catch {
-    return '--:--';
-  }
+  if (!isoDate) return '';
+  const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function Matches() {

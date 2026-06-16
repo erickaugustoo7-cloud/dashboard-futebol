@@ -226,7 +226,7 @@ export default function ConfrontoPage() {
 
   const parsedDate = date ? new Date(date) : null;
   const dateLabel = (parsedDate && !isNaN(parsedDate.getTime()))
-    ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
 
   const hs = analysis?.home_scout;

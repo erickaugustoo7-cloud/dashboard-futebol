@@ -223,7 +223,7 @@ export default function Dashboard() {
                     <div className="match-meta">
                       <span className="league-badge">{match.league_name}</span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        {match.date && !isNaN(new Date(match.date).getTime()) ? new Date(match.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        {match.date && !isNaN(new Date(match.date).getTime()) ? new Date(match.date).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
                     <div className={`confidence-badge ${confClass}`}>
