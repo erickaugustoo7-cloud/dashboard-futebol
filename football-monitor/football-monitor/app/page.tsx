@@ -372,7 +372,7 @@ export default function Dashboard() {
                           border: '1px solid var(--border)',
                           color: 'var(--text-muted)',
                         }}>
-                          {s.label} · {s.probability}%
+                          {s.label} · {s.probability}% · odd {s.fair_odd?.toFixed(2)}
                         </div>
                       ))}
                     </div>
