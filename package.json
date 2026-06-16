@@ -1,6 +1,25 @@
 {
+  "name": "football-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "sync:local": "curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/sync-matches | jq ."
+  },
   "dependencies": {
-    "firebase": "^12.14.0",
-    "node.js": "^0.0.1-security"
+    "@supabase/supabase-js": "^2.108.1",
+    "firebase-admin": "^12.0.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
   }
 }
