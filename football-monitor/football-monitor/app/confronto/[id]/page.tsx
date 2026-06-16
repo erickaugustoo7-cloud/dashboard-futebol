@@ -127,7 +127,8 @@ function calcOdds(probPct: number): string {
 }
 
 // Componente para Tabela Detalhada de Mercado (Over/Under)
-function MarketLinesTable({ title, mean, minLine, maxLine, step = 1 }: { title: string; mean: number; minLine: number; maxLine: number; step?: number }) {
+function MarketLinesTable({ title, mean, minLine, maxLine, step = 1, defaultExpanded = false }: { title: string, mean: number, minLine: number, maxLine: number, step?: number, defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const rows = [];
   for (let line = minLine; line <= maxLine; line += step) {
     // Probabilidade de MENOS DE (Under)
